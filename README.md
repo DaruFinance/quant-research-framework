@@ -1,10 +1,31 @@
 # Quant Research Backtester (Walk-Forward + Robustness)
+Research-grade Python framework for evaluating systematic trading strategies using walk-forward optimization, statistical validation, and robustness testing.
 
 A research-oriented Python backtesting framework for systematic strategies with **strict no look-ahead rules**, **walk-forward optimization (WFO)**, **robustness stress tests**, and optional **Monte Carlo diagnostics**.
 
 This project is designed to answer one question:
 
 > Does an apparent edge survive **out-of-sample** evaluation under realistic frictions (fees, slippage, funding) — or is it just fitting the past?
+
+## Quick Start
+
+1. Install dependencies
+
+pip install -r requirements.txt
+
+2. Download OHLC data from Binance
+
+python binance_ohlc_downloader.py --symbol DOGEUSDT --interval 30m --market spot --source api --since 2017-11-01 --until now --out data/DOGEUSDT_30m.csv
+
+3. Configure the backtester
+
+Edit the configuration variables at the top of `backtester.py` and set:
+
+CSV_FILE = "data/DOGEUSDT_30m.csv"
+
+4. Run the backtester
+
+python backtester.py
 
 ---
 
