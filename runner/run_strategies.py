@@ -1191,13 +1191,7 @@ def run_all(base_output: str,
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
     mp.freeze_support()
-    # try:
-    #     mp.set_start_method('spawn', force=True)
-    # except RuntimeError:
-    #     pass
-    # _warmup_numba()
 
-    # 1) Standard run
     run_all(
         base_output=r"YOUR_OUTPUT_FOLDER_HERE",  # <-- Set this to your desired output folder path (e.g. r"C:\Strategies\MyRun" on Windows)
         regime_seg=False,
@@ -1207,15 +1201,4 @@ if __name__ == '__main__':
         reserve_free_gb=2.0  # keep at least 4 GiB headroom
     )
 
-    # run_all(
-    #     base_output=r"D:\Strategies\BTC15m_Rob_Reg",
-    #     regime_seg=True
-    # )
-
-    # # 2) Same run but with higher slippage (1.25 pips),
-    # #    outputs to strategy_outputs_forex_more_slip
-    # run_all(
-    #     base_output='strategy_outputs_forex_FTMO_Reg',
-    #     regime_seg=True
-    # )
 
