@@ -1,0 +1,14 @@
+# Runner-specific dependencies
+# Install these in addition to the root requirements.txt
+
+# Already in root requirements.txt:
+pandas
+numpy
+matplotlib
+pytz
+
+# Additional runner dependencies:
+psutil          # memory-aware worker scaling
+
+# Note: multiprocessing is part of the Python standard library (no install needed)
+
