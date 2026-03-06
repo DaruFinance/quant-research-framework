@@ -77,3 +77,16 @@ Install:
 
 ```bash
 pip install pandas numpy matplotlib numba pytz
+```
+
+---
+
+## Downstream Analysis
+
+Large batch runs generated with `runner/run_strategies.py` can be analyzed with the
+**Strategy Generalization Analysis** toolkit:
+
+https://github.com/DaruFinance/strategy-generalization-analysis
+
+This tool evaluates strategy robustness, estimates generalization probabilities,
+and performs portfolio simulations on walk-forward results.
