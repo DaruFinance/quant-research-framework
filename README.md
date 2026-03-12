@@ -90,3 +90,13 @@ https://github.com/DaruFinance/strategy-generalization-analysis
 
 This tool evaluates strategy robustness, estimates generalization probabilities,
 and performs portfolio simulations on walk-forward results.
+
+---
+
+## Rust Version
+
+A speed-optimized Rust port of the batch strategy runner is available at:
+
+https://github.com/DaruFinance/quant-backtester-rs
+
+Same logic, same strategy grid (~20,000 variants), same output format — but **140x faster** (0.5s vs 70s for 50 strategies on a Ryzen 9 7950X). Uses O(n) rolling computations, signal caching across robustness scenarios, and parallel execution via `rayon`.
