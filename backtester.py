@@ -26,7 +26,9 @@ from numba import njit, types
 from numba.typed import List
 
 # Configuration
-CSV_FILE            = "data/your_ohlc.csv" # <-- put your CSV here (not included in repo)
+# CSV_FILE can be overridden without editing this file by setting the BT_CSV
+# environment variable — handy when running a strategy example from examples/.
+CSV_FILE            = os.environ.get("BT_CSV", "data/your_ohlc.csv") # <-- put your CSV here (not included in repo)
 
 ACCOUNT_SIZE        = 100_000.0      # total account equity in USD
 RISK_AMOUNT         = 2_500.0       # dollars you are willing to lose per trade
