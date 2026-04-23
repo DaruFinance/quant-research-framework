@@ -40,6 +40,26 @@ python backtester.py
 - **`indicators_tradingview.py`**  
   Helper indicator functions used by the backtester (EMA/SMA/RSI/ATR/etc., depending on your implementation).
 
+- **`examples/`**  
+  Tutorial folder showing how to plug a custom strategy into the pipeline. Includes `atr_cross/atr_cross.py` (ATR-cross with an RSI ≥ 50 confluence) and a [`README.md`](examples/README.md) that walks through the raw-signals contract.
+
+---
+
+## Adding your own strategy
+
+A strategy is a single function returning a `numpy.int8` array of `{-1, 0, +1}` per bar:
+
+```python
+def my_strategy(df: pd.DataFrame, lb: int) -> np.ndarray:
+    ...  # return +1 (long), -1 (short), or 0 (no signal), no look-ahead.
+
+import backtester as bt
+bt.create_raw_signals = my_strategy
+bt.main()
+```
+
+See [`examples/README.md`](examples/README.md) for the full contract and `examples/atr_cross/atr_cross.py` for a worked example.
+
 ---
 
 ## Key Features
@@ -80,6 +100,15 @@ pip install pandas numpy matplotlib numba pytz
 ```
 
 ---
+
+## Rust port
+
+A 1-to-1 Rust port of this backtester is available at
+[**DaruFinance/quant-research-framework-rs**](https://github.com/DaruFinance/quant-research-framework-rs).
+Same strategy logic, same metrics, same WFO/robustness pipeline — runs
+~24× faster with ~53× lower peak memory on the same CSV. Its
+`examples/atr_cross.rs` produces identical IS/OOS numbers to this repo's
+`examples/atr_cross/atr_cross.py` when pointed at the same data.
 
 ## License
 
