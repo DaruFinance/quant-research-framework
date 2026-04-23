@@ -9,23 +9,23 @@ This project is designed to answer one question:
 
 ## Quick Start
 
-1. Install dependencies
-
+```bash
 pip install -r requirements.txt
 
-2. Download OHLC data from Binance
+# Zero-setup smoke test: generate a synthetic OHLC CSV and run.
+python gen_synthetic.py
+BT_CSV=data/SYNTHETIC.csv python backtester.py
+```
 
-python binance_ohlc_downloader.py --symbol DOGEUSDT --interval 30m --market spot --source api --since 2017-11-01 --until now --out data/DOGEUSDT_30m.csv
+For real market data, swap the generator for a download:
 
-3. Configure the backtester
+```bash
+python binance_ohlc_downloader.py --symbol DOGEUSDT --interval 30m --market spot \
+    --source api --since 2017-11-01 --until now --out data/DOGEUSDT_30m.csv
+BT_CSV=data/DOGEUSDT_30m.csv python backtester.py
+```
 
-Edit the configuration variables at the top of `backtester.py` and set:
-
-CSV_FILE = "data/DOGEUSDT_30m.csv"
-
-4. Run the backtester
-
-python backtester.py
+`BT_CSV` overrides the `CSV_FILE` constant in `backtester.py` without touching the source. If you prefer, edit the constant at the top of `backtester.py` instead.
 
 ---
 
@@ -36,6 +36,9 @@ python backtester.py
 
 - **`binance_ohlc_downloader.py`**  
   Utility to download and format OHLC candles from Binance into the CSV format expected by the backtester.
+
+- **`gen_synthetic.py`**  
+  GBM-based synthetic OHLC generator. No network required — use it for smoke-testing or reproducible demos. Writes `data/SYNTHETIC.csv` in the same format the Binance downloader emits.
 
 - **`indicators_tradingview.py`**  
   Helper indicator functions used by the backtester (EMA/SMA/RSI/ATR/etc., depending on your implementation).
