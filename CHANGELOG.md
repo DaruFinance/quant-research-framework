@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-04-26
+
+### Fixed
+- **Session-end force-close now actually fires.** Two underlying bugs in
+  `_backtest_numba_core` / `_prepare_backtest_inputs`:
+  1. `session_end_mask` was set to `times.dt.time == t_end` — i.e. only
+     bars whose NY local time *exactly* equalled SESSION_END
+     ("16:50") qualified. Bars at any other minute (e.g. crypto bars
+     at HH:00, or the synthetic HH:26:40 fixture) silently never
+     triggered the force-close, so positions could carry across
+     out-of-session windows. Replaced with the standard "last
+     in-session bar of each contiguous in-session run" detection.
+  2. The force-close branch was guarded on `code != 0`, meaning even
+     when the mask was correct the force-close required a strategy
+     signal on the closing bar to fire. Removed that guard.
+- The previously-xfail test `test_session_blocks_overnight_carry_known_quirk`
+  is now a regular passing test
+  (`test_session_force_close_prevents_overnight_carry`).
+
+### Notes
+- These changes touch behaviour ONLY when `TRADE_SESSIONS = True`. None
+  of the currently published research uses session mode, so v0.2.0–0.2.2
+  numbers from default-config (sessions off) runs are unaffected. The
+  v0.1.0 parity harness still reports 56/56 byte-identical.
+
 ## [0.2.2] — 2026-04-26
 
 ### Added

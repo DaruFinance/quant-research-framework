@@ -61,18 +61,12 @@ def test_no_entry_outside_session_window(monkeypatch):
     )
 
 
-@pytest.mark.xfail(
-    reason="Known Python design choice: _backtest_numba_core only force-closes "
-           "at session_end when code != 0 (line 950 guard). When no signal "
-           "lands on the last in-session bar, the position carries across "
-           "out-of-session windows. The Rust port mirrors this behaviour for "
-           "parity. Removing the guard would change all published research "
-           "numbers, so it's left as-is and documented here.",
-    strict=True,
-)
-def test_session_blocks_overnight_carry_known_quirk(monkeypatch):
-    """If you ever fix the `code != 0` guard, this test will start passing
-    and you should flip xfail off."""
+def test_session_force_close_prevents_overnight_carry(monkeypatch):
+    """When TRADE_SESSIONS is on, no trade may span out-of-session bars.
+    Fixed in v0.2.2 by removing the `and code != 0` guard on the
+    session-end force-close path — previously that guard silently let
+    positions carry across session gaps when no signal landed on the
+    closing bar."""
     monkeypatch.setattr(bt, "TRADE_SESSIONS", True)
     monkeypatch.setattr(bt, "SESSION_START",  "8:00")
     monkeypatch.setattr(bt, "SESSION_END",   "16:50")
@@ -87,7 +81,8 @@ def test_session_blocks_overnight_carry_known_quirk(monkeypatch):
     overnight = [(ent, exi) for side, ent, exi, *_ in trades
                  if (~in_flags[ent : exi + 1]).any()]
     assert not overnight, (
-        f"Trades span out-of-session bars: {len(overnight)} found"
+        f"Session-end force-close regressed — {len(overnight)} trades span "
+        f"out-of-session bars. First few: {overnight[:5]}"
     )
 
 

@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 import os, math, random
 import time as pytime
@@ -828,7 +828,14 @@ def _prepare_backtest_inputs(df, sig):
         session_mask     = ((times.dt.time >= t_start) &
                             (times.dt.time <= t_end)).to_numpy(np.bool_)
         session_idxs     = np.flatnonzero(session_mask).astype(np.int64)
-        session_end_mask = (times.dt.time == t_end).to_numpy(np.bool_)
+        # v0.2.3 fix: previously this required the bar's local time to
+        # *exactly* equal SESSION_END (e.g. 16:50). Bars at any other
+        # minute (e.g. crypto bars at HH:00) silently never triggered the
+        # force-close, so positions could carry across out-of-session
+        # windows. Mark the LAST in-session bar of each contiguous
+        # in-session run instead.
+        next_in = np.concatenate([session_mask[1:], [False]])
+        session_end_mask = session_mask & ~next_in
     else:
         session_idxs     = np.arange(n, dtype=np.int64)
         session_end_mask = np.zeros(n, dtype=np.bool_)
@@ -945,11 +952,17 @@ def _backtest_numba_core(o, h, l, c, sig,
         if use_regime and idx < 200:
             continue
 
-        # forced exit for news / session end
+        # forced exit for news / session end. v0.2.3 fix: drop the prior
+        # `and code != 0` guard — the force-close should fire whenever an
+        # open position exists at a session-end / news-close bar, regardless
+        # of whether the strategy happens to emit a signal on that same bar.
+        # Prior behaviour silently carried positions across out-of-session
+        # windows; no published research used TRADE_SESSIONS so this is a
+        # zero-cost correctness fix.
         end_bar_flag = session_end[idx] if use_sessions else False
-        if open_pos != 0 and code != 0:                #  extra guard: bar passed confluences
+        if open_pos != 0:
             if (use_news and news_close[idx]) or (use_sessions and end_bar_flag):
-                code = 2 if open_pos == 1 else 4        # force opposite exit
+                code = 2 if open_pos == 1 else 4
         if use_sessions and (code in (1, 3)) and end_bar_flag:
             code = 0                                    # block new entry
 
