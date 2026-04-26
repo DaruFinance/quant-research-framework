@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-04-25
+
+### Added
+- **Behavioural test suite** (`tests/test_behavioural.py`) covering forex
+  mode (PnL semantics actually change), session mode (out-of-session
+  entries are masked), OOS2 (split-point preservation), regime LB
+  rotation (per-regime dict keys come from `REGIME_LABELS`), and the
+  news-injection robustness scenario (bar series is actually perturbed).
+- **Cross-language parity harness** at the sibling Rust repo's
+  `tools/parity_check.py`. Runs both engines on the same dataset with
+  matching defaults and asserts agreement on baseline + optimised + WFO
+  metrics. Verified at byte-identity (0% relative diff) across 8 tag
+  groups × 7 metrics on the bundled SOLUSDT_1h dataset.
+
+### Notes
+- This release adds verification, not behaviour. The engine code paths
+  for forex / session / OOS2 / regime did not change relative to v0.2.0;
+  what changed is that those paths now have explicit tests and a
+  cross-language oracle backing the parity claim.
+
 ## [0.2.0] — 2026-04-25
 
 ### Added
