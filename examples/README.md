@@ -95,6 +95,94 @@ If you need an indicator that isn't in `indicators_tradingview.py`, add
 it there or inline it in your strategy file — the helpers in that module
 are short and easy to extend.
 
+## Plugging in a machine-learning model
+
+The `(df, lb) -> np.ndarray[int8]` contract is intentionally narrow so any
+prediction source — sklearn, lightgbm, torch, an ONNX runtime, an external
+service — fits as long as you can turn its output into +1 / -1 / 0 per bar.
+
+There are two patterns. They are not mutually exclusive; pick whichever
+matches how you already train.
+
+### 1. Pre-computed predictions column ( `examples/ml_precomputed/` )
+
+Train offline, attach a `pred` column to the OHLC frame (or a sidecar CSV
+that you join on `time`), and let the strategy function threshold it.
+
+```python
+def ml_precomputed_signals(df, lb):
+    pred_prev = df['pred'].shift(1).values     # no look-ahead
+    raw = np.zeros(len(df), dtype=np.int8)
+    raw[pred_prev >= 0.55] =  1
+    raw[pred_prev <= 0.45] = -1
+    return raw
+
+bt.create_raw_signals = ml_precomputed_signals
+```
+
+Use this when you can train ahead of time. It is the fastest path and
+keeps the engine completely framework-agnostic.
+
+### 2. Per-bar callback ( `examples/ml_callback/` )
+
+Keep the model in memory and call `predict(features)` inside the loop.
+Slower, but the only way to do online / stateful inference, or to mix
+training and backtesting in the same process.
+
+```python
+def ml_callback_signals(df, lb):
+    raw = np.zeros(len(df), dtype=np.int8)
+    for i in range(len(df)):
+        feats = extract_window_features(df, i, lb)   # uses df[: i] only
+        if feats.size == 0:
+            continue
+        score = MODEL.predict(feats)
+        if   score >= 0.55: raw[i] =  1
+        elif score <= 0.45: raw[i] = -1
+    return raw
+```
+
+The look-ahead rule is the same as for any other strategy: features for
+bar `i` may only use data from bars `i-1` and earlier. The example
+ships a tiny hand-coded linear model so it runs without sklearn / torch
+installed; swap it for any object exposing `.predict(features) -> float`.
+
+## Plugging in a custom regime detector
+
+Regime segmentation has two pluggable seams:
+
+```python
+bt.REGIME_LABELS  = ['Calm', 'Volatile']            # 2..5 labels
+bt.detect_regimes = my_detector                     # (df) -> pd.Series[label]
+```
+
+`my_detector` returns one label per bar drawn from `REGIME_LABELS`. The
+optimiser then runs one look-back search per label, the WFO loop rotates
+the active LB bar-by-bar in OOS, and `evaluate_filters` /
+`backtest_continuous_regime` work transparently with whatever set you
+provide.
+
+Constraints:
+
+* `len(REGIME_LABELS)` must be in `{2, 3, 4, 5}`.
+* `detect_regimes(df)` must be free of look-ahead — only use information
+  available at bar `i-1` or earlier when labelling bar `i`.
+* The series your detector returns must be indexed the same as `df`
+  (default `RangeIndex` from `load_ohlc`).
+
+`examples/regime_custom/regime_custom.py` shows three demos:
+
+1. **2-regime volatility detector** — Calm vs Volatile by 50-bar realised
+   vol vs its 250-bar median.
+2. **4-regime trend × volatility** — CalmUp / CalmDown / VolUp / VolDown.
+3. **5-regime ML-style detector** — quantile bucketing of (return, vol),
+   structured to be drop-in-replaceable with a fitted scikit-learn
+   `KMeans` / `GaussianMixture` / HMM.
+
+Pick one by editing the `DEMO` constant at the top of the file. The same
+pattern works for any ML detector: load weights once at import time, do
+inference inside `detect_regimes(df)`, return labels.
+
 ## A Rust port exists too
 
 If you want the same pipeline but ~24× faster, see

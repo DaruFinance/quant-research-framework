@@ -1,3 +1,6 @@
+# Backtest outputs
+trade_list.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
