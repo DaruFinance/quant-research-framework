@@ -146,10 +146,15 @@ A 1-to-1 Rust port of this backtester is available at
 [**DaruFinance/quant-research-framework-rs**](https://github.com/DaruFinance/quant-research-framework-rs).
 Same strategy logic, same metrics, same WFO/robustness pipeline. The
 Rust port reproduces every IS/OOS/baseline/optimised/WFO metric line
-byte-for-byte against this Python reference at the default config (56/56
-metric points; verified by
-[`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py)),
-runs **25–60× faster**, and uses **~37× less memory**:
+byte-for-byte against this Python reference on two independent surfaces:
+
+- **Default config (56/56 metric points byte-identical at 0.001 tol)** — verified by
+  [`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py).
+- **Regime + WFO (14/14 metric tags byte-identical at 0.001 tol)** — verified
+  by [`tools/parity_regime.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_regime.py)
+  as of the Rust port's v0.3.0 release.
+
+It runs **25–60× faster** and uses **~37× less memory**:
 
 | Bars   | Python (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
 |-------:|-----------:|---------:|---------:|----------------:|--------------:|
