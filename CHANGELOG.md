@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-04-26
+
+### Added
+- **Comparison matrix** in `README.md` — this framework vs vectorbt /
+  backtrader / NautilusTrader / zipline-reloaded / Lean / bt across
+  built-in WFO, per-regime LB optimisation, strict-LAH property tests,
+  cross-language byte-parity. Verified against primary docs as of
+  2026-04.
+- **Benchmark table** in `README.md` — measured numbers from the new
+  `tools/bench.py` harness in the sibling Rust repo. Replaces the
+  unsourced "~24× faster" claim with reproducible figures across four
+  dataset sizes (15k / 25k / 35k / 48k bars on the bundled SOL CSV).
+- **`CITATION.cff`** with sibling cross-reference to the Rust port so
+  citing either implies citing the framework as a whole.
+
+### Notes
+- No backtester engine changes in this release; v0.2.3 numerics are
+  preserved. The Rust port's matching v0.3.0 release verifies
+  regime+WFO byte-identical parity against this Python reference (see
+  the sibling repo's `tools/parity_regime.py`).
+
 ## [0.2.3] — 2026-04-26
 
 ### Fixed

@@ -144,10 +144,58 @@ pip install pandas numpy matplotlib numba pytz
 
 A 1-to-1 Rust port of this backtester is available at
 [**DaruFinance/quant-research-framework-rs**](https://github.com/DaruFinance/quant-research-framework-rs).
-Same strategy logic, same metrics, same WFO/robustness pipeline — runs
-~24× faster with ~53× lower peak memory on the same CSV. Its
-`examples/atr_cross.rs` produces identical IS/OOS numbers to this repo's
-`examples/atr_cross/atr_cross.py` when pointed at the same data.
+Same strategy logic, same metrics, same WFO/robustness pipeline. The
+Rust port reproduces every IS/OOS/baseline/optimised/WFO metric line
+byte-for-byte against this Python reference at the default config (56/56
+metric points; verified by
+[`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py)),
+runs **25–60× faster**, and uses **~37× less memory**:
+
+| Bars   | Python (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
+|-------:|-----------:|---------:|---------:|----------------:|--------------:|
+| 15,000 |       3.03 |     0.05 |   60.60× |             273 |             4 |
+| 25,000 |       3.75 |     0.10 |   37.50× |             277 |             6 |
+| 35,000 |       4.60 |     0.14 |   32.86× |             282 |             7 |
+| 48,000 |       5.78 |     0.23 |   25.13× |             294 |             8 |
+
+(Min wall-clock and max peak RSS over 3 warm runs on the bundled
+`SOLUSDT_1h.csv`. Reproduce with `python tools/bench.py` from the
+sibling repo.)
+
+## Comparison vs other open-source backtesters
+
+What this framework emphasises that mainstream open-source alternatives do
+not (verified against primary docs as of 2026-04):
+
+| Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
+|------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
+| **this** (Python + Rust) | MIT                    | ✓            | ✓                          | ✓                         | ✓                                |
+| [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |
+| [backtrader][bt]       | GPL-3.0                  | ✗ (community) | ✗                         | ✗                         | n/a                              |
+| [NautilusTrader][nt]   | LGPL-3.0                 | ✗ (engine only) | ✗                       | ✗                         | ✗ (bilingual; no parity asserts) |
+| [zipline-reloaded][zl] | Apache-2.0               | ✗ (3rd-party) | ✗                         | ✗                         | n/a                              |
+| [QuantConnect Lean][lean] | Apache-2.0            | ✓            | ✗                          | ✗                         | n/a                              |
+| [bt][btp]              | MIT                      | ✗            | ✗                          | ✗                         | n/a                              |
+
+The **combination** is the contribution: WFO + per-regime LB + strict
+no-look-ahead enforced by property tests + a Python reference and Rust
+port whose outputs agree byte-for-byte on the deterministic pipeline.
+Each cell individually exists somewhere; no other framework ships the
+whole bundle.
+
+[vbt]: https://github.com/polakowo/vectorbt
+[bt]:  https://github.com/mementum/backtrader
+[nt]:  https://github.com/nautechsystems/nautilus_trader
+[zl]:  https://github.com/stefan-jansen/zipline-reloaded
+[lean]: https://github.com/QuantConnect/Lean
+[btp]: https://github.com/pmorissette/bt
+
+## Citation
+
+If you use this framework in academic or research work, please cite via
+[`CITATION.cff`](CITATION.cff). The Rust port has its own
+[`CITATION.cff`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/CITATION.cff)
+and citing either implies the other (sibling cross-reference).
 
 ## License
 

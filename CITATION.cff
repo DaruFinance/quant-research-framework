@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software in academic or research work, please cite it as below."
+title: "quant-research-framework: a walk-forward backtester with strict no-look-ahead property tests and cross-language parity"
+type: software
+authors:
+  - family-names: "DaruFinance"
+    name-particle: ""
+repository-code: "https://github.com/DaruFinance/quant-research-framework"
+license: MIT
+keywords:
+  - backtesting
+  - walk-forward optimization
+  - quantitative finance
+  - reproducibility
+  - regime segmentation
+references:
+  - type: software
+    title: "quant-research-framework-rs (Rust port)"
+    repository-code: "https://github.com/DaruFinance/quant-research-framework-rs"
+    license: MIT
