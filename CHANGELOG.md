@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-04-26
+
+### Added
+- **Property-check suite** (`tests/test_invariants.py`, 9 tests + 1
+  documented xfail). Checks the engine's actual outputs rather than
+  just whether flags wire through:
+  - No trade entry on a bar whose NY local time is outside the session
+    window
+  - `create_regime_signals` uses the slow-EMA selected by `best_lbs[regime[i]]`
+    on every bar (validated against a hand-computed reference with
+    deliberately distinct per-regime LBs)
+  - Forex per-trade PnL clamped to `[-1R, +RRR×1R]` band (plus fee slack)
+  - OOS2 invariants: `OOS_CANDLES = 2 × ORIGINAL_OOS` when the flag is on
+  - Trade tuples are well-formed (sides ∈ {-1,1}, indices in range,
+    entry ≤ exit, prices > 0, PnL finite)
+  - parse_signals is look-ahead-clean (mutating raw[cut:] doesn't change sig[:cut])
+  - Default regime detector is look-ahead-clean
+  - WFO+regime cadence: optimize_regimes_sequential always called with
+    BACKTEST_CANDLES-sized IS slices, never with regime-stretch sizes
+- **Documented Python design quirk** (xfail test): `_backtest_numba_core`
+  guards session-end force-close on `code != 0` (line 950), so when no
+  signal lands on the last in-session bar, the position carries across
+  out-of-session windows. Removing the guard would change every
+  published research number, so it stays documented. The Rust port
+  mirrors it for parity.
+
+### Verified
+- v0.1.0 parity still 56/56 byte-identical at 0.1% tol.
+- 24 tests passing total + 1 documented xfail.
+
 ## [0.2.1] — 2026-04-25
 
 ### Added
