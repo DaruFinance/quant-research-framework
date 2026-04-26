@@ -6,6 +6,8 @@ authors:
   - family-names: "DaruFinance"
     name-particle: ""
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
+url: "https://doi.org/10.5281/zenodo.19798594"
+doi: 10.5281/zenodo.19798594
 license: MIT
 keywords:
   - backtesting
@@ -17,4 +19,5 @@ references:
   - type: software
     title: "quant-research-framework-rs (Rust port)"
     repository-code: "https://github.com/DaruFinance/quant-research-framework-rs"
+    doi: 10.5281/zenodo.19798592
     license: MIT
