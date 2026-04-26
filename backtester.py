@@ -12,6 +12,8 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
+__version__ = "0.2.0"
+
 import os, math, random
 import time as pytime
 import numpy as np
@@ -73,6 +75,10 @@ FILTER_REGIMES     = False      # works only when USE_REGIME_SEG == True
 FILTER_DIRECTIONS  = False      # blocks long / short based on IS stats
 
 USE_REGIME_SEG       = False   # enable regime segmentation?
+
+# Regime detector contract (pluggable; reassign at module level to override).
+# REGIME_LABELS may have length 2..5. Default = EMA-200 / 8-bar consistency.
+REGIME_LABELS: list[str] = ['Uptrend', 'Downtrend', 'Ranging']
 
 # Robustness tests
 FEE_SHOCK              = False          # Multiply fees for stress testing.
@@ -623,8 +629,12 @@ def get_regimes(df, length=8):
     Label each bar as 'Uptrend', 'Downtrend' or 'Ranging' based on EMA_200.
     Uptrend  = close > EMA_200 for the past length bars
     Downtrend= close < EMA_200 for the past length bars
+
+    This is the default implementation used by `detect_regimes`. To use a
+    different detector (volatility regimes, ML-based regimes, 2- or 5-regime
+    schemes, etc.), reassign the module-level `detect_regimes` symbol and
+    update `REGIME_LABELS` to match.
     """
-    # use yesterdays info to avoid lookahead
     close = df['close'].shift(1)
     ema200 = df['EMA_200'].shift(1)
 
@@ -639,11 +649,29 @@ def get_regimes(df, length=8):
     regimes.loc[downtrend] = 'Downtrend'
 
     pct = regimes.value_counts(normalize=True) * 100
-    print(f"Regime distribution: "
-          f"Uptrend {pct.get('Uptrend',0):.1f}%, "
-          f"Downtrend {pct.get('Downtrend',0):.1f}%, "
-          f"Ranging {pct.get('Ranging',0):.1f}%")
+    parts = [f"{lbl} {pct.get(lbl, 0):.1f}%" for lbl in REGIME_LABELS]
+    print("Regime distribution: " + ", ".join(parts))
     return regimes
+
+
+def detect_regimes(df: pd.DataFrame) -> pd.Series:
+    """
+    Pluggable regime detector. Returns a pd.Series of labels (strings drawn
+    from REGIME_LABELS) of the same length as `df`. The default implementation
+    delegates to `get_regimes` (EMA-200 / 8-bar consistency, 3 regimes).
+
+    Custom detectors must:
+      * Return labels that are a subset of `REGIME_LABELS` (length 2..5)
+      * Be free of look-ahead — only use information available at bar i-1 or
+        earlier when labelling bar i.
+    Override pattern (in your strategy file):
+        import backtester as bt
+        bt.REGIME_LABELS  = ['Calm', 'Volatile']
+        bt.detect_regimes = my_detector
+    """
+    if not (2 <= len(REGIME_LABELS) <= 5):
+        raise ValueError(f"REGIME_LABELS must have length 2..5, got {len(REGIME_LABELS)}")
+    return get_regimes(df)
 
 def create_regime_signals(df, best_lbs, regimes):
     """
@@ -1691,7 +1719,7 @@ def backtest_continuous_regime(df, best_lbs):
             dfi[f'EMA_{lb}'] = dfi['close'].ewm(span=lb, adjust=False).mean()
 
     # 2) label regimes
-    regimes = get_regimes(dfi)
+    regimes = detect_regimes(dfi)
 
     # 3) build full raw & filter
     ema20    = dfi['EMA_20'].shift(1)
@@ -1761,28 +1789,26 @@ def backtest_continuous_regime(df, best_lbs):
 
 def optimize_regimes_sequential(is_df):
     """
-    Three-phase, sequential regime LB optimization with coarsefine search and RRR:
-      1 Optimize 'Uptrend' LB (others = DEFAULT_LB)
-      2 Optimize 'Downtrend' LB (Uptrend fixed)
-      3 Optimize 'Ranging' LB (Up & Down fixed)
+    Sequential per-regime LB optimisation with coarse/fine search (and optional
+    RRR optimisation). Iterates over `REGIME_LABELS` in order; on phase k the
+    LB for label k is searched while LBs for labels 0..k-1 are held at their
+    previously chosen values and labels k+1.. are held at DEFAULT_LB.
     Returns:
-      best_lbs:  dict {'Uptrend': lb1, 'Downtrend': lb2, 'Ranging': lb3}
-      best_rrrs: dict of RRR per regime (if OPTIMIZE_RRR)
+      best_lbs:  dict {label: lb}        (one entry per REGIME_LABELS)
+      best_rrrs: dict {label: rrr | None}
+    Works with REGIME_LABELS of any length in {2, 3, 4, 5}.
     """
     import math
     global last_unfiltered_raw
 
-    # Precompute full IS EMAs and regimes once
     dfi = is_df.copy()
     dfi['EMA_20']  = is_df['close'].ewm(span=20,  adjust=False).mean()
     dfi['EMA_200'] = is_df['close'].ewm(span=200, adjust=False).mean()
     dfi['EMA_900'] = is_df['close'].ewm(span=900, adjust=False).mean()
-    regimes = get_regimes(dfi)
+    regimes = detect_regimes(dfi)
 
-    # Pre-shift fast EMA
     ema20 = dfi['EMA_20'].shift(1).values
 
-    # Precompute slow EMAs for all candidate lookbacks, *excluding* the fast span
     lbs_candidates = [
         lb for lb in range(*LOOKBACK_RANGE)
         if lb != FAST_EMA_SPAN
@@ -1791,10 +1817,8 @@ def optimize_regimes_sequential(is_df):
         lb: is_df['close'].ewm(span=lb, adjust=False).mean().shift(1).values
         for lb in lbs_candidates
     }
-    # 
 
-
-    regs = ['Uptrend','Downtrend','Ranging']
+    regs = list(REGIME_LABELS)
     best_lbs  = {r: DEFAULT_LB for r in regs}
     best_rrrs = {r: None       for r in regs}
 
@@ -1985,12 +2009,12 @@ def classic_single_run(df):
     if USE_REGIME_SEG and not USE_WFO:
         # 1) find best LBs per regime on IS
         dfi_full   = compute_indicators(is_df, DEFAULT_LB)
-        regimes_is = get_regimes(dfi_full)
+        regimes_is = detect_regimes(dfi_full)
         best_lbs, best_rrrs = optimize_regimes_sequential(is_df)
 
         # report RRRs
         print("\n Best RRR per regime ")
-        for reg in ['Uptrend','Downtrend','Ranging']:
+        for reg in REGIME_LABELS:
             rrr = best_rrrs.get(reg)
             print(f"  {reg:>9}: RRR = {rrr if rrr is not None else 'None'}")
 
@@ -2013,7 +2037,7 @@ def classic_single_run(df):
 
         # 3) apply filters if enabled
         evaluate_filters(tr_is_reg, rets_is_reg,
-                         get_regimes(compute_indicators(is_df, DEFAULT_LB)))
+                         detect_regimes(compute_indicators(is_df, DEFAULT_LB)))
         print("\n Filter Conclusion for OOS:")
         if FILTER_REGIMES:
             print(f"  Regimes removed: {', '.join(blocked_regimes) or 'None'}")
@@ -2268,25 +2292,44 @@ def classic_single_run(df):
 
 
 # 11. WALK-FORWARD (only windows)
-def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_scenarios, export_is=False):
+def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_scenarios, export_is=False, best_lbs=None):
     """
     Backtest a single WFO window (IS + OOS), optionally with robustness tweaks.
-    """
 
-    def _run_segment(df_seg, lb_use, regimes_seg, drift=False):
-        dfi = compute_indicators(df_seg.copy(), lb_use)
-        raw = create_raw_signals(dfi, lb_use)
+    If `best_lbs` is given (regime-segmentation mode), the active LB rotates per
+    bar according to `regimes_is` / `regimes_oos`. Otherwise a single `lb` is
+    used for the whole window. The WFO walk cadence (window boundaries) is
+    decided by the caller and is *not* affected by regime changes — only the
+    per-bar choice of LB inside the window changes.
+    """
+    use_regime = best_lbs is not None
+
+    def _run_segment(df_seg, lb_use, regimes_seg, drift=False, best_lbs_seg=None):
+        if best_lbs_seg is not None:
+            dfi = df_seg.copy()
+            for span in (20, 200, 900):
+                dfi[f'EMA_{span}'] = dfi['close'].ewm(span=span, adjust=False).mean()
+            for lb_v in {v for v in best_lbs_seg.values() if v is not None}:
+                dfi[f'EMA_{lb_v}'] = dfi['close'].ewm(span=lb_v, adjust=False).mean()
+            raw = create_regime_signals(dfi, best_lbs_seg, regimes_seg)
+        else:
+            dfi = compute_indicators(df_seg.copy(), lb_use)
+            raw = create_raw_signals(dfi, lb_use)
         raw = filter_raw_signals(raw, regimes_seg)
         sig = parse_signals(raw, dfi['time'])
         if drift:
             sig = drift_entries(sig)
         return backtest(dfi, sig)
 
+    bs_lbs = best_lbs if use_regime else None
+    lb_tag = (",".join(f"{r}:{v}" for r, v in best_lbs.items() if v is not None)
+              if use_regime else lb)
+
     # baseline
-    tr_is,  met_is,  eq_is,  _, _ = _run_segment(is_df,  lb, regimes_is, drift=False)
-    tr_oos, met_oos, _, rets_oos, _ = _run_segment(oos_df, lb, regimes_oos, drift=False)
-    prettyprint(f"{window_tag} IS",  met_is,  lb)
-    prettyprint(f"{window_tag} OOS", met_oos, lb)
+    tr_is,  met_is,  eq_is,  _, _ = _run_segment(is_df,  lb, regimes_is, drift=False, best_lbs_seg=bs_lbs)
+    tr_oos, met_oos, _, rets_oos, _ = _run_segment(oos_df, lb, regimes_oos, drift=False, best_lbs_seg=bs_lbs)
+    prettyprint(f"{window_tag} IS",  met_is,  lb_tag)
+    prettyprint(f"{window_tag} OOS", met_oos, lb_tag)
 
     # export WFO trades for this window (IS + OOS) to the shared trade list
     header_needed = not os.path.exists(EXPORT_PATH)
@@ -2313,18 +2356,29 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
         globals()['FEE_PCT']      = fee_old  * fee_mult
         globals()['SLIPPAGE_PCT'] = slip_old * slip_mult
 
-        lb_rb    = max(1, lb + rng.choice([-1, 1])) if var_on else lb
         is_work  = inject_news_candles(is_df.copy())  if news_on else is_df
         oos_work = inject_news_candles(oos_df.copy()) if news_on else oos_df
 
-        try:
-            _, met_is_rb, eq_is_rb, _, _ = _run_segment(is_work,  lb_rb, regimes_is, drift=drift_on)
-            _, met_oos_rb, _, rets_rb, _ = _run_segment(oos_work, lb_rb, regimes_oos, drift=drift_on)
-        finally:
-            globals()['FEE_PCT'], globals()['SLIPPAGE_PCT'] = fee_old, slip_old
-
-        prettyprint(f"{window_tag} IS+{label}",  met_is_rb,  lb_rb)
-        prettyprint(f"{window_tag} OOS+{label}", met_oos_rb, lb_rb)
+        if use_regime:
+            lb_rb_dict = {r: (max(1, v + rng.choice([-1, 1])) if (var_on and v is not None) else v)
+                          for r, v in best_lbs.items()}
+            lb_rb_tag = ",".join(f"{r}:{v}" for r, v in lb_rb_dict.items() if v is not None)
+            try:
+                _, met_is_rb, eq_is_rb, _, _ = _run_segment(is_work,  lb, regimes_is, drift=drift_on, best_lbs_seg=lb_rb_dict)
+                _, met_oos_rb, _, rets_rb, _ = _run_segment(oos_work, lb, regimes_oos, drift=drift_on, best_lbs_seg=lb_rb_dict)
+            finally:
+                globals()['FEE_PCT'], globals()['SLIPPAGE_PCT'] = fee_old, slip_old
+            prettyprint(f"{window_tag} IS+{label}",  met_is_rb,  lb_rb_tag)
+            prettyprint(f"{window_tag} OOS+{label}", met_oos_rb, lb_rb_tag)
+        else:
+            lb_rb    = max(1, lb + rng.choice([-1, 1])) if var_on else lb
+            try:
+                _, met_is_rb, eq_is_rb, _, _ = _run_segment(is_work,  lb_rb, regimes_is, drift=drift_on)
+                _, met_oos_rb, _, rets_rb, _ = _run_segment(oos_work, lb_rb, regimes_oos, drift=drift_on)
+            finally:
+                globals()['FEE_PCT'], globals()['SLIPPAGE_PCT'] = fee_old, slip_old
+            prettyprint(f"{window_tag} IS+{label}",  met_is_rb,  lb_rb)
+            prettyprint(f"{window_tag} OOS+{label}", met_oos_rb, lb_rb)
         rb_rets[label] = rets_rb
         rb_eq_is[label] = eq_is_rb
 
@@ -2353,101 +2407,115 @@ def walk_forward(df, met_is_baseline, eq_is_baseline):
         rb_scenarios.append((label, opts))
 
     # ===== 1.  WFO **with** regime segmentation ============================
+    # Rewritten in v0.2.0: WFO walks the standard cadence (candles or trades).
+    # Regime segmentation only changes which per-regime LB is active for each
+    # OOS bar; the WFO test/train boundaries are NOT shifted by regime changes.
     if USE_WFO and USE_REGIME_SEG:
         n           = len(df)
         start_total = n - OOS_CANDLES
+        cur_start   = start_total
+        window_no   = 1
+        all_oos_rets = []
+        rb_totals = {label: [] for label, _ in rb_scenarios}
         eq_is_first = None
         rb_eq_seed: dict[str, np.ndarray] = {}
 
-        # 1 full-data regimes
+        # full-data regimes (computed once; pluggable detector)
         dfi_full     = compute_indicators(df, DEFAULT_LB)
-        regimes_full = get_regimes(dfi_full)
+        regimes_full = detect_regimes(dfi_full)
 
-        # 2 initial IS (one LB per regime)
+        # one-shot evaluate_filters on the very first IS window (identical to
+        # the legacy behaviour, but anchored to the WFO IS window not a regime
+        # stretch). This matters when FILTER_REGIMES / FILTER_DIRECTIONS is on.
         is_start_init = max(0, start_total - BACKTEST_CANDLES)
-        is_df_init    = dfi_full.iloc[is_start_init:start_total].reset_index(drop=True)
+        is_df_init    = df.iloc[is_start_init:start_total].reset_index(drop=True)
         regimes_init  = regimes_full.iloc[is_start_init:start_total].reset_index(drop=True)
+        initial_lbs, _ = optimize_regimes_sequential(is_df_init)
+        if initial_lbs and any(v is not None for v in initial_lbs.values()):
+            dfi_init = is_df_init.copy()
+            for span in (20, 200, 900):
+                dfi_init[f'EMA_{span}'] = dfi_init['close'].ewm(span=span, adjust=False).mean()
+            for lb_v in {v for v in initial_lbs.values() if v is not None}:
+                dfi_init[f'EMA_{lb_v}'] = dfi_init['close'].ewm(span=lb_v, adjust=False).mean()
+            raw_init = create_regime_signals(dfi_init, initial_lbs, regimes_init)
+            sig_init = parse_signals(raw_init, dfi_init['time'])
+            tr_init, _, _, rets_init, _ = backtest(dfi_init, sig_init)
+            evaluate_filters(tr_init, rets_init, regimes_init)
 
-        initial_lbs = {}
-        for reg in ['Uptrend', 'Downtrend', 'Ranging']:
-            df_reg = is_df_init[regimes_init == reg]
-            if df_reg.empty: continue
-            lb_reg, _ = optimiser(df_reg.reset_index(drop=True),
-                                  range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
-            if lb_reg:
-                initial_lbs[reg] = lb_reg
+        while cur_start < n:
+            # --- decide window end (same cadence as the no-regime path) ---
+            if WFO_TRIGGER_MODE == 'candles':
+                cur_end = min(cur_start + WFO_TRIGGER_VAL, n)
+            else:   # by trade-count
+                is_win_start_p = cur_start - BACKTEST_CANDLES
+                is_df_p        = df.iloc[is_win_start_p:cur_start].reset_index(drop=True)
+                best_lbs_p, _  = optimize_regimes_sequential(is_df_p)
+                if not best_lbs_p or all(v is None for v in best_lbs_p.values()):
+                    break
+                dfo_p     = df.iloc[cur_start:n].reset_index(drop=True)
+                regimes_p = regimes_full.iloc[cur_start:n].reset_index(drop=True)
+                dfi_p = dfo_p.copy()
+                for span in (20, 200, 900):
+                    dfi_p[f'EMA_{span}'] = dfi_p['close'].ewm(span=span, adjust=False).mean()
+                for lb_v in {v for v in best_lbs_p.values() if v is not None}:
+                    dfi_p[f'EMA_{lb_v}'] = dfi_p['close'].ewm(span=lb_v, adjust=False).mean()
+                raw_p = create_regime_signals(dfi_p, best_lbs_p, regimes_p)
+                raw_p = filter_raw_signals(raw_p, regimes_p)
+                sig_p = parse_signals(raw_p, dfi_p['time'])
+                tr_p, _, _, _, _ = backtest(dfi_p, sig_p)
+                if not tr_p:
+                    cur_end = n
+                else:
+                    idx     = min(WFO_TRIGGER_VAL, len(tr_p)) - 1
+                    cur_end = min(cur_start + tr_p[idx][2] + 1, n)
 
-        # 2b  evaluate filters on that initial IS segment
-        raw_init = create_regime_signals(is_df_init, initial_lbs, regimes_init)
-        sig_init = parse_signals(raw_init, is_df_init['time'])
-        tr_init, _, _, rets_init, _ = backtest(is_df_init, sig_init)
-        evaluate_filters(tr_init, rets_init, regimes_init)
+            # --- IS slice + per-regime optimisation -----------------------
+            is_win_start = cur_start - BACKTEST_CANDLES
+            is_df_roll   = df.iloc[is_win_start:cur_start].reset_index(drop=True)
+            regimes_is   = regimes_full.iloc[is_win_start:cur_start].reset_index(drop=True)
 
-        # 3 identify regime boundaries inside OOS
-        regime_vals_oos = regimes_full.iloc[start_total:].values
-        change_rel_idx  = np.where(regime_vals_oos[1:] != regime_vals_oos[:-1])[0] + 1
-        boundaries      = [0] + change_rel_idx.tolist() + [len(regime_vals_oos)]
+            best_lbs, _  = optimize_regimes_sequential(is_df_roll)
+            if not best_lbs or all(v is None for v in best_lbs.values()):
+                break
 
-        all_oos_rets = []
-        rb_totals = {label: [] for label, _ in rb_scenarios}
-        last_best_lb = initial_lbs.copy()
-
-        # 4 walk every contiguous regime stretch
-        for w in range(len(boundaries) - 1):
-            rel_start = boundaries[w]
-            rel_end   = boundaries[w + 1]
-            abs_start = start_total + rel_start
-            abs_end   = start_total + rel_end
-
-            cur_regime = regime_vals_oos[rel_start]
-
-            # --- choose LB ---------------------------------------------------
-            if w == 0 and cur_regime in initial_lbs:
-                lb_use = initial_lbs[cur_regime]
-            else:
-                is_start = max(0, abs_start - BACKTEST_CANDLES)
-                df_roll  = dfi_full.iloc[is_start:abs_start]
-                reg_mask = regimes_full.iloc[is_start:abs_start] == cur_regime
-                df_roll  = df_roll[reg_mask]
-
-                lb_use, _ = optimiser(df_roll.reset_index(drop=True),
-                                      range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
-                if not lb_use:
-                    lb_use = last_best_lb.get(cur_regime, DEFAULT_LB)
-            last_best_lb[cur_regime] = lb_use
-
-            # --- run OOS slice ---------------------------------------------
-            dfo_slice   = df.iloc[abs_start:abs_end].reset_index(drop=True)
-
-            is_slice    = df.iloc[is_start:abs_start].reset_index(drop=True)
-            regimes_is  = regimes_full.iloc[is_start:abs_start].reset_index(drop=True)
-            regimes_oos = regimes_full.iloc[abs_start:abs_end].reset_index(drop=True)
+            # --- OOS slice with regime-rotated signals --------------------
+            dfo          = df.iloc[cur_start:cur_end].reset_index(drop=True)
+            regimes_oos  = regimes_full.iloc[cur_start:cur_end].reset_index(drop=True)
 
             rets_oos, rb_rets_window, eq_is_window, rb_eq_is_window = _run_wfo_window(
-                is_slice, dfo_slice, lb_use,
-                window_tag=f"W{w+1:02d}",
+                is_df_roll, dfo, lb=None,
+                window_tag=f"W{window_no:02d}",
                 regimes_is=regimes_is,
                 regimes_oos=regimes_oos,
                 rb_scenarios=rb_scenarios,
-                export_is=(w == 0)  # only export IS for W01
+                export_is=(window_no == 1),
+                best_lbs=best_lbs,
             )
             if eq_is_first is None:
-                # capture the actual IS equity used by the first WFO window
                 eq_is_first = eq_is_window
-                # seed robustness IS curves from the same window if present
                 for label, eq_is_rb in rb_eq_is_window.items():
                     rb_eq_seed[label] = eq_is_rb
             all_oos_rets.extend(rets_oos)
             for label in rb_totals:
                 rb_totals[label].extend(rb_rets_window.get(label, []))
 
+            cur_start = cur_end
+            window_no += 1
+
         eq_seed = eq_is_first if eq_is_first is not None else eq_is_baseline
         all_oos_rets = np.array(all_oos_rets, dtype=float)
         eq_wfo = np.concatenate([eq_seed,
                                  eq_seed[-1] + np.cumsum(all_oos_rets)])
 
-        # Regime WFO path currently has no robustness overlays; return empty dict to keep signature uniform
         rb_eq_curves: dict[str, np.ndarray] = {}
+        if rb_totals:
+            for label, vals in rb_totals.items():
+                if not vals:
+                    continue
+                arr = np.array(vals, dtype=float)
+                seed_rb = rb_eq_seed.get(label, eq_seed)
+                rb_eq_curves[label] = np.concatenate([seed_rb,
+                                                      seed_rb[-1] + np.cumsum(arr)])
 
         split_wfo_is = len(eq_seed) - 1
         return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is

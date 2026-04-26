@@ -69,13 +69,43 @@ See [`examples/README.md`](examples/README.md) for the full contract and `exampl
 
 ### Walk-Forward Evaluation (WFO)
 - Baseline IS and OOS backtests
-- Rolling re-optimization and forward testing per window
+- Rolling re-optimization and forward testing per window (`USE_WFO`,
+  `WFO_TRIGGER_MODE` ∈ {`candles`, `trades`}, `WFO_TRIGGER_VAL`)
 - Aggregated WFO performance curve + replication checks
+- **WFO + regime segmentation**: WFO walks its standard cadence; the
+  per-regime LB just rotates inside each window — fixed in v0.2.0 (was
+  previously re-anchoring the IS window on every regime change).
 
 ### Realism Controls
 - Configurable **fees** and **slippage** on entry/exit
 - Optional **funding fees** for crypto at scheduled UTC times
 - Optional **stop-loss / take-profit** with intrabar checks (high/low)
+- **Forex mode** (`FOREX_MODE`): pip-based risk units (auto-detects JPY
+  pip size), no funding fees, R-denominated PnL. Off by default.
+- **Session mode** (`TRADE_SESSIONS`): restricts trading to a NY-time
+  window (`SESSION_START`, `SESSION_END`); positions are force-closed on
+  the last in-session bar of each day.
+- **Second OOS split** (`USE_OOS2`): doubles the OOS window so the
+  framework can score the strategy on two contiguous OOS blocks
+  (OOS1 + OOS2) for an extra layer of out-of-sample evidence.
+
+### Regime segmentation
+- 3-regime EMA-based detector by default (Uptrend / Downtrend / Ranging)
+- **Pluggable**: override `REGIME_LABELS` (length 2..5) and
+  `detect_regimes(df) -> pd.Series` to plug in any analytic or ML-based
+  detector. See [`examples/regime_custom/`](examples/regime_custom) for
+  three demos (vol2, vol4, ml5).
+- Per-regime LB optimisation, OOS LB rotation, optional regime/direction
+  filters (`FILTER_REGIMES`, `FILTER_DIRECTIONS`).
+
+### ML-driven strategies
+- The signal contract `(df, lb) -> np.ndarray[int8]` is unchanged, so
+  any model that can produce per-bar long/short scores plugs in.
+- Two patterns shipped:
+  - [`examples/ml_precomputed/`](examples/ml_precomputed) — train
+    offline, attach a `pred` column, threshold inside the strategy fn.
+  - [`examples/ml_callback/`](examples/ml_callback) — keep a model in
+    memory and call `predict(features)` per bar (online / stateful).
 
 ### Robustness / Stress Tests
 Optional scenarios such as:
@@ -87,6 +117,12 @@ Optional scenarios such as:
 
 ### Statistical Diagnostics (Optional)
 - Monte Carlo / bootstrap-style validation to compare realized metrics vs randomized outcomes
+
+### Versioning
+
+The framework follows [Semantic Versioning](https://semver.org/). See
+[`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
+`__version__` constant in `backtester.py` is the source of truth.
 
 ---
 
