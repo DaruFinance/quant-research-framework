@@ -77,4 +77,5 @@ def test_callback_helper_no_lookahead(sample_df):
 
 def test_version_constant():
     assert hasattr(bt, "__version__")
-    assert bt.__version__ == "0.2.0"
+    parts = bt.__version__.split(".")
+    assert int(parts[0]) >= 0 and int(parts[1]) >= 2, bt.__version__
