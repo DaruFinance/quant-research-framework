@@ -67,6 +67,19 @@ TP_PERCENTAGE  = 3.0     # take profit percent (e.g. 2.0 for 2%)
 OPTIMIZE_RRR  = True     # set True to auto-optimise the Risk-to-Reward ratio
 
 CONFLUENCES: str | None = None        # "RSIge50", "Pge0.8", ...
+MASK_EXITS = False        # confluence filter: when False (default), the
+                          # confluence rule applies only to entries (codes 1, 3);
+                          # exit codes (2, 4) pass through unconditionally.
+                          # When True, the rule applies to exits too — useful for
+                          # strategies where exit signals also need confirmation.
+
+LEGACY_SIDE_BUG = False   # RRR-optimisation side comparison: the original
+                          # `side == 'long'` test compared int8 against str and
+                          # always took the else (short) branch. Default is now
+                          # the corrected `side == 1` test. Set True to
+                          # reproduce numerical results of research published
+                          # against versions <= v0.2.4 that depended on the
+                          # buggy code path. See CHANGELOG v0.2.5.
 
 # Forex mode: when True, use pip-based risk units.
 FOREX_MODE = False        # Convert percentage distances to pip distances.
@@ -619,6 +632,18 @@ def parse_signals(raw: np.ndarray, times: pd.Series) -> np.ndarray:
         # zero them out where mask_allow is False
         sig[(sig == 1) & (~mask_allow)] = 0
         sig[(sig == 3) & (~mask_allow)] = 0
+
+        # Optional symmetric exit-side filter. When MASK_EXITS is True the
+        # confluence rule applies to exit codes (2 = long-close, 4 = short-close)
+        # too — the bar must satisfy the confluence (codes != 0) for the exit
+        # to fire. This is desirable for strategies whose exits also need
+        # confirmation (e.g. only close on a confirming candle); the default
+        # (False) preserves the v0.2.x behaviour where exits are unconditional
+        # on signal flip.
+        if MASK_EXITS:
+            mask_allow_exit = (codes != 0)
+            sig[(sig == 2) & (~mask_allow_exit)] = 0
+            sig[(sig == 4) & (~mask_allow_exit)] = 0
 
     return sig
 
@@ -1298,7 +1323,11 @@ def optimiser(df, lb_range, metric, min_trades):
                 entry_price = dfi['close'].iloc[e]
                 risk = entry_price * SL_PERCENTAGE / 100.0
 
-                if side == 'long':
+                # NOTE: pre-v0.2.5 used `side == 'long'`, which compared int8
+                # against a str and always took the else branch. Default now is
+                # the corrected `side == 1` test; LEGACY_SIDE_BUG=True reverts.
+                is_long = (side == 'long') if LEGACY_SIDE_BUG else (side == 1)
+                if is_long:
                     high_slice = dfi['high'].iloc[e:x+1].values
                     peak_R = (high_slice.max() - entry_price) / risk
                     close_R = (dfi['close'].iloc[x] - entry_price) / risk
@@ -1637,7 +1666,8 @@ def optimise_regime_full(df_full, regimes, target_regime, current_lbs,
                     continue
                 entry = base['close'].iloc[ent]
                 risk = entry * SL_PERCENTAGE / 100.0
-                if side == 'long':
+                is_long = (side == 'long') if LEGACY_SIDE_BUG else (side == 1)
+                if is_long:
                     peak = base['high'].iloc[ent:exi+1].max()
                     close = base['close'].iloc[exi]
                     peak_Rs.append(min((peak - entry) / risk, 5.0))
@@ -1757,7 +1787,8 @@ def backtest_continuous_regime(df, best_lbs):
         for side, e, x, _, _, *_ in trades_probe:
             entry = dfi['close'].iloc[e]
             risk  = entry * SL_PERCENTAGE/100
-            if side == 'long':
+            is_long = (side == 'long') if LEGACY_SIDE_BUG else (side == 1)
+            if is_long:
                 seg       = dfi['high'].iloc[e:x+1].values
                 peak_R    = (seg.max() - entry) / risk
                 close_R   = (dfi['close'].iloc[x] - entry) / risk
@@ -1871,7 +1902,8 @@ def optimize_regimes_sequential(is_df):
                     if regimes.iloc[ent] != reg:
                         continue
                     risk = entry * SL_PERCENTAGE / 100.0
-                    if side == 'long':
+                    is_long = (side == 'long') if LEGACY_SIDE_BUG else (side == 1)
+                    if is_long:
                         seg = dfi['high'].iloc[ent:exi+1].values
                         peak_Rs.append(min((seg.max() - entry) / risk, 5.0))
                         close_Rs.append((exit_p - entry) / risk)

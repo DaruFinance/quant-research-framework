@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] — 2026-04-30
+
+### Fixed
+- **RRR-optimisation side-comparison bug.** The four RRR-probe sites
+  (`backtester.py` ~lines 1314, 1657, 1778, 1893) used `side == 'long'`
+  (str compared to int8 — always False), sending all trades to the
+  short branch. Now uses `side == 1` by default. Set the new
+  `LEGACY_SIDE_BUG` module flag to `True` to opt back into the buggy
+  code path for bit-equality with prior research that depends on it
+  (default `False`). Tests in `tests/` continue to pass at the
+  corrected default.
+
+### Added
+- **`MASK_EXITS` flag** (default `False`) in `parse_signals`: when
+  `True`, the active confluence rule (per `CONFLUENCES`) applies to
+  exit codes (2, 4) too, not just entries (1, 3). Default preserves
+  v0.2.x behaviour (exits unconditional on signal flip).
+- **`listings/lah_demo.py`** — future-pollution probe demonstrating
+  that the strategy contract's no-look-ahead obligation is
+  user-checkable. Referenced from §3 of the paper.
+
+### Notes
+- Cross-language parity verified at the new defaults: 56/56
+  default-config + 98/98 regime+WFO + 56/56 forex (the third
+  surface, closed in this release; see the Rust repo's
+  `tools/parity_forex.py`).
+
 ## [0.2.4] — 2026-04-26
 
 ### Added
