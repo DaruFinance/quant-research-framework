@@ -95,7 +95,7 @@ automatically on push.
 - Tag the release; GitHub Actions drives the Zenodo archive on tag
   creation.
 - Tag the matching commit on `quant-research-framework-rs` with the
-  same version suffix (e.g. Python `v0.2.5` ↔ Rust `v0.3.1`).
+  same version suffix (e.g. Python `v0.4.0` ↔ Rust `v0.3.3`).
 
 ## Reporting bugs
 

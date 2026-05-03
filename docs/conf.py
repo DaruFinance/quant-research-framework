@@ -13,7 +13,7 @@ os.environ.setdefault("BT_CSV", "data_SOLUSDT_1h.csv")
 project = "quant-research-framework"
 author = "Daniel Vieira Gatto"
 copyright = "2026, Daniel Vieira Gatto"
-release = "0.3.1"
+release = "0.4.0"
 
 extensions = [
     "sphinx.ext.autodoc",

@@ -168,7 +168,7 @@ Optional scenarios such as:
 The framework follows [Semantic Versioning](https://semver.org/). See
 [`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
 `version` field in [`pyproject.toml`](pyproject.toml) is the source of
-truth (currently `0.3.1`).
+truth (currently `0.4.0`).
 
 ---
 

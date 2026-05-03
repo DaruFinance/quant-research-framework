@@ -46,3 +46,4 @@ the two tags so they agree on a `paper-vN` retag.
 |---|---|---|
 | `v0.3.0`   | `v0.3.2` | paper-v2 |
 | `v0.3.1`   | `v0.3.3` | paper-v2 polish |
+| `v0.4.0`   | `v0.3.3` | Config dataclass refactor (Python) |
