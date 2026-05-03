@@ -86,17 +86,22 @@ def deflated_sharpe_ratio(
 
     sr_0 = expected_max_sharpe_under_null(trial_sharpes)
 
-    # Per-trade-return higher moments. Skewness uses the standard
-    # bias-corrected estimator; excess kurtosis is g_4 - 3 in
-    # statistical software, but Bailey--LdP use g_4 = E[(x-mu)^4]/sigma^4
-    # (raw kurtosis) so we report the raw form.
+    # Per-trade-return higher moments. Bailey & López de Prado (2014),
+    # JPM 40(5):94--107, eq. (9) defines the variance correction term as
+    #     sqrt( 1 - g_3 * SR + (g_4 - 1) * SR^2 / 4 )
+    # where g_4 is the *raw* fourth standardised moment
+    #     g_4 = E[(x - mu)^4] / sigma^4
+    # so g_4 = 3 for a Normal distribution (NOT excess kurtosis g_4 - 3).
+    # The (g_4 - 1) coefficient in the formula is therefore correct as
+    # written below — it reduces to (3 - 1) / 4 = 0.5 in the Normal case,
+    # exactly as derived in Bailey-LdP §3.
     mu  = float(rets.mean())
     sd  = float(rets.std(ddof=1))
     if sd <= 0.0:
         return float("nan")
     z   = (rets - mu) / sd
     g_3 = float(np.mean(z ** 3))             # skewness
-    g_4 = float(np.mean(z ** 4))             # raw kurtosis (3 for normal)
+    g_4 = float(np.mean(z ** 4))             # raw kurtosis (= 3 for Normal)
 
     denom_sq = 1.0 - g_3 * sharpe_chosen + (g_4 - 1.0) * sharpe_chosen ** 2 / 4.0
     if denom_sq <= 0.0:

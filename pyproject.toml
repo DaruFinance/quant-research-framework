@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quant-research-framework"
-version = "0.3.0"
+version = "0.3.1"
 description = "Walk-forward backtester with statistical validation and robustness testing for systematic trading strategies."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,11 +24,16 @@ classifiers = [
 dependencies = [
     "pandas",
     "numpy",
+    "scipy",
     "matplotlib",
     "numba",
     "pytz",
     "requests",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "hypothesis"]
+examples = ["scikit-learn"]
 
 [project.urls]
 Homepage = "https://github.com/DaruFinance/quant-research-framework"

@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-03
+
+### Fixed
+- **Module import works without a CSV.** The top-level
+  `FileNotFoundError` raise in `backtester/__init__.py` (~line 149) ran at
+  import time, so `pip install quant-research-framework` followed by
+  `import backtester as bt` would fail unless the user had pre-staged a
+  CSV at `data/your_ohlc.csv`. The check now lives inside `load_ohlc()`
+  and `main()`. Library-style use (`bt.create_raw_signals = ...; bt.main()`)
+  is unaffected; `python -m backtester` still surfaces the same clear
+  error message before any heavy import / numba JIT.
+- **`PIP_SIZE` substring fallback now warns.** The legacy
+  `"JPY" in CSV_FILE` heuristic still fires for backwards compatibility
+  but emits a `UserWarning` so users on filenames like `"FUJPYR.csv"`
+  know the auto-detect can be wrong. New `BT_PIP_SIZE` env var takes
+  precedence and silences the warning when set explicitly.
+- **DSR comment vs formula mismatch.** `backtester/dsr.py` line 99
+  formerly said "raw kurtosis (3 for normal)" with no link back to the
+  Bailey-LdP 2014 derivation; the reader could not tell at a glance why
+  the variance correction is `(g_4 - 1)` and not `(g_4 - 3)` (which would
+  be excess kurtosis). The comment now spells out that g_4 is the raw
+  fourth standardised moment and that (3 - 1) / 4 = 0.5 is the
+  Normal-case reduction, citing Bailey-LdP 2014 §3 / eq. (9).
+- **`OOS_CANDLES` doubling timing documented.** The
+  `if USE_OOS2: OOS_CANDLES *= 2` runs at module import; flipping the
+  flag after `import backtester` has no effect on the constant. A NOTE
+  block now spells out the constraint and the workaround.
+
+### Added
+- **`backtester/__main__.py`** — `python -m backtester` entry point so
+  the README quickstart works post-package refactor (the legacy
+  `python backtester.py` form broke when v0.3.0 turned `backtester` into
+  a directory).
+- **`pyproject.toml` deps cleanup.** `scipy` (DSR), `pytest` and
+  `hypothesis` (test suite) and `scikit-learn` (ML examples) are now
+  declared. Layout: `[project] dependencies = [..., "scipy", ...]`,
+  `[project.optional-dependencies] dev = ["pytest", "hypothesis"]`,
+  `examples = ["scikit-learn"]`. `pip install
+  quant-research-framework[dev,examples]` installs everything the test
+  suite and example notebooks need.
+- **GitHub repo discoverability scaffolding** — issue + PR templates,
+  `SECURITY.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `.github/dependabot.yml` (weekly pip updates), README badges row.
+- **CI improvements** — multi-OS + multi-Python matrix
+  (`{ubuntu, macos, windows} x {3.10, 3.11, 3.12}`) for the pytest job;
+  parity scripts remain Linux-only as before. Pre-commit config
+  (`ruff format`, `ruff check`) wired into a CI job.
+- **Sphinx docs scaffold** under `docs/` (Furo theme, autodoc-driven)
+  with a `.github/workflows/docs.yml` that builds and publishes to
+  `gh-pages` on each `main` push.
+- **PyPI publish workflow.** `.github/workflows/publish-pypi.yml`
+  triggered by `v*` tag push, using PyPI trusted publishing — see
+  `RELEASING.md` for the one-time configuration step.
+- **Notebook walkthrough** (`examples/notebook/walkthrough.ipynb`) —
+  load synthetic data, run baseline, run WFO, plot equity, show
+  metrics. Binder launch link in the README, `binder/` dir with
+  `requirements.txt` and `runtime.txt`.
+- **Property-test coverage on `walk_forward_regime`** — three new
+  Hypothesis-based invariants in `tests/test_invariants_property.py`
+  guarding the OOS LB rotation against the v0.3.0 parity-bug class.
+
 ## [0.3.0] — 2026-05-03  (paper-v2 retag)
 
 ### Changed

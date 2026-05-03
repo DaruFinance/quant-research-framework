@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 # Zero-setup smoke test: generate a synthetic OHLC CSV and run.
 python gen_synthetic.py
-BT_CSV=data/SYNTHETIC.csv python backtester.py
+BT_CSV=data/SYNTHETIC.csv python -m backtester
 ```
 
 For real market data, swap the generator for a download:
@@ -26,10 +26,12 @@ For real market data, swap the generator for a download:
 ```bash
 python binance_ohlc_downloader.py --symbol DOGEUSDT --interval 30m --market spot \
     --source api --since 2017-11-01 --until now --out data/DOGEUSDT_30m.csv
-BT_CSV=data/DOGEUSDT_30m.csv python backtester.py
+BT_CSV=data/DOGEUSDT_30m.csv python -m backtester
 ```
 
-`BT_CSV` overrides the `CSV_FILE` constant in `backtester.py` without touching the source. If you prefer, edit the constant at the top of `backtester.py` instead.
+`BT_CSV` overrides the `CSV_FILE` constant in `backtester/__init__.py` without touching the source. If you prefer, edit the constant at the top of `backtester/__init__.py` instead.
+
+Note: the framework was repackaged from a single `backtester.py` script into a `backtester/` package in v0.3.0; the `python -m backtester` form replaces the legacy `python backtester.py` invocation.
 
 ---
 
@@ -127,7 +129,7 @@ Optional scenarios such as:
 The framework follows [Semantic Versioning](https://semver.org/). See
 [`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
 `version` field in [`pyproject.toml`](pyproject.toml) is the source of
-truth (currently `0.3.0`, `paper-v2` retag).
+truth (currently `0.3.1`).
 
 ---
 

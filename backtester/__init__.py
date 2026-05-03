@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.2.4"
+__version__ = "0.3.1"
 
 import os, math, random
 import time as pytime
@@ -125,8 +125,34 @@ blocked_pairs       = {}             # per-regime direction blocks  e.g. {'Uptre
 last_unfiltered_raw = None
 ORIGINAL_OOS        = OOS_CANDLES               # preserve the single-window length
 if USE_OOS2:
+    # NOTE: OOS_CANDLES doubling is applied at module-import time. Flipping
+    # USE_OOS2 dynamically AFTER `import backtester` has no effect on this
+    # constant. To switch modes mid-process, set OOS_CANDLES = ORIGINAL_OOS * 2
+    # (or back) yourself, or re-import. This is the documented constraint.
     OOS_CANDLES     = ORIGINAL_OOS * 2         # everywhere uses the doubled window
-PIP_SIZE   = 0.01 if "JPY" in CSV_FILE else 0.0001
+
+# Pip size: explicit env override wins. The legacy substring fallback
+# (path containing "JPY") still triggers for convenience but emits a
+# warning so users know it can be wrong on filenames like "FUJPYR.csv".
+def _resolve_pip_size(csv_path: str) -> float:
+    override = os.environ.get("BT_PIP_SIZE")
+    if override is not None:
+        try:
+            return float(override)
+        except ValueError:
+            raise ValueError(f"BT_PIP_SIZE={override!r} is not a valid float")
+    if "JPY" in csv_path:
+        import warnings
+        warnings.warn(
+            f"PIP_SIZE auto-set to 0.01 because CSV path {csv_path!r} contains "
+            "'JPY'. This substring heuristic is fragile; set BT_PIP_SIZE "
+            "explicitly to silence this warning.",
+            stacklevel=2,
+        )
+        return 0.01
+    return 0.0001
+
+PIP_SIZE   = _resolve_pip_size(CSV_FILE)
 if FOREX_MODE:
     # turn your percent vars into fraction-of-price pip distances
     SL_PERCENTAGE *= PIP_SIZE
@@ -146,12 +172,9 @@ else:
     dd_constraint = DRAWDOWN_CONSTRAINT if FOREX_MODE else DRAWDOWN_CONSTRAINT / 100.0
 FAST_EMA_SPAN = 20
 
-if not os.path.exists(CSV_FILE):
-    raise FileNotFoundError(
-        f"CSV file not found: {CSV_FILE}\n\n"
-        "Put your OHLC CSV at that path, or change CSV_FILE.\n"
-        "You can generate one with binance_ohlc_downloader.py (see README)."
-    )
+# NOTE: the FileNotFoundError check used to live at module top-level here.
+# It has been moved into load_ohlc() and main() so `import backtester` works
+# in pip-install / library workflows that never read CSVs.
 
 def in_session(ts: datetime) -> bool:
     """ts is a timezone-aware NY datetime."""
@@ -304,6 +327,12 @@ def load_ohlc(path: str) -> pd.DataFrame:
     and convert to America/New_York timezone (with DST).
     Returns a DataFrame with a timezone-aware 'time' column.
     """
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"CSV file not found: {path}\n\n"
+            "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
+            "You can generate one with binance_ohlc_downloader.py (see README)."
+        )
     df = pd.read_csv(path, usecols=['time', 'open', 'high', 'low', 'close'])
     # 1) Parse UNIX seconds as UTC timestamps
     # 2) Convert them into America/New_York (handles DST automatically)
@@ -2977,6 +3006,14 @@ def age_dataset(df, age):
 
 # 12. MAIN
 def main():
+    # Explicit early check so users running `python -m backtester` get a
+    # clear error before any heavy imports / numba JIT warm-up happens.
+    if not os.path.exists(CSV_FILE):
+        raise FileNotFoundError(
+            f"CSV file not found: {CSV_FILE}\n\n"
+            "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
+            "You can generate one with binance_ohlc_downloader.py (see README)."
+        )
     df = load_ohlc(CSV_FILE)
 
     df = age_dataset(df, AGE_DATASET)
