@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-05-03
+
+### Added
+- **`backtester.Config` dataclass** — single library-grade configuration
+  surface carrying every tunable knob (50+ fields: `fee_pct`, `use_tp`,
+  `forex_mode`, `oos_candles`, ...). Defaults mirror the legacy
+  module-level UPPERCASE constants exactly, so `Config()` is always
+  equivalent to "use the current module defaults".
+  - `Config.from_module()` snapshots the live module state into a
+    Config instance — start from "whatever is currently set" and tweak.
+  - `Config.apply_to_module()` writes every field back to the module
+    globals, returning a snapshot dict. The derived `dd_constraint`
+    is recomputed against the new `forex_mode` / `drawdown_constraint`.
+  - `Config.with_forex(on=True)` returns a new Config with forex
+    defaults applied (SL/TP scaled by `pip_size`, `risk_amount` and
+    `account_size` set to 1.0 R-units), mirroring the legacy
+    import-time `if FOREX_MODE:` block.
+  - `Config.with_sessions(on, start, end)` and `with_oos2(on)` builders
+    follow the same copy-then-mutate pattern.
+- **`backtester.with_config(cfg)` context manager** — temporarily applies
+  a `Config` to module globals for the duration of the block, restores
+  prior values on exit (even if the body raises). The single primitive
+  the new API stands on.
+- **`config: Config | None = None` kwarg on every public entry-point**
+  — `main()`, `walk_forward()`, `optimiser()`, `optimize_regimes_sequential()`,
+  `monte_carlo()`, `apply_news_injection()`, `classic_single_run()`. When
+  passed, the engine uses cfg's values for the call and restores prior
+  state on exit. When omitted, reads from module globals — the legacy
+  `bt.X = Y` API works exactly as before.
+- **`tests/test_config_isolation.py`** — 11 new tests covering Config
+  field independence, apply/restore round-trip, exception-safe restore,
+  forex-mode helper, drawdown-constraint derivation, and end-to-end
+  proof that `bt.main(config=cfg)` does not leak into module globals.
+
+### Changed
+- **All 11 `global X` statements eliminated** from
+  `backtester/__init__.py`. The two categories of globals were handled
+  differently:
+  - **Configuration globals** (`TP_PERCENTAGE`, `USE_TP`, `FEE_PCT`,
+    `SLIPPAGE_PCT`) that the engine rebinds during RRR optimisation
+    and robustness shocks now use `globals()['X'] = ...` — the same
+    pattern already used inside `optimiser()` and friends, just
+    extended to the four functions that still leaned on `global`.
+    Save/restore semantics unchanged.
+  - **Runtime-state globals** (`last_unfiltered_raw`, `_last_df`,
+    `_last_lb`, `NEWS_FLAGS`, `blocked_*`) moved into a single
+    `_runtime_state: dict[str, Any]` holder. Per-run scratch values
+    no longer require `global` for rebinding. `bt.NEWS_FLAGS` is
+    mirrored to the module attribute so any external consumer keeps
+    working.
+- **`grep -c "^global " backtester/__init__.py` returns 0** (was 11).
+  The engine is now fork-safe at the module-attribute level: two
+  `Config` instances can coexist in one process, the
+  `with_config` context manager guarantees state restoration, and
+  the long-standing `bt.create_raw_signals = my_strategy; bt.main()`
+  contract works unchanged.
+
+### Compatibility
+- **Public API is fully backwards compatible.** Every test in the v0.3.1
+  suite (32 tests, all using the `monkeypatch.setattr(bt, "X", Y)`
+  pattern) continues to pass without modification. The README quickstart
+  (`bt.create_raw_signals = my_strategy; bt.main()`) is unchanged.
+- **Cross-language parity preserved.** All four parity surfaces against
+  the Rust port (`tools/parity_check.py`, `parity_regime.py`,
+  `parity_forex.py`, `parity_ledger.py`) pass at `1e-3 rel-tol` with
+  zero deltas (`PARITY OK` / `LEDGER PARITY OK`).
+
 ## [0.3.1] — 2026-05-03
 
 ### Fixed

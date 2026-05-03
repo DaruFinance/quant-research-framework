@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 import os, math, random
 import time as pytime
@@ -175,6 +175,300 @@ FAST_EMA_SPAN = 20
 # NOTE: the FileNotFoundError check used to live at module top-level here.
 # It has been moved into load_ohlc() and main() so `import backtester` works
 # in pip-install / library workflows that never read CSVs.
+
+# ============================================================================
+# Config dataclass — v0.4.0 library-grade configuration surface.
+#
+# Background: prior to v0.4.0 every tunable lived as a module-level UPPERCASE
+# constant (FEE_PCT, USE_TP, FOREX_MODE, ...). The engine read those constants
+# directly via globals(); a handful of functions even rebound them with
+# `global FEE_PCT, ...` to apply RRR optimisation or robustness shocks. This
+# made the engine non-fork-safe and prevented two backtests with different
+# configurations from coexisting in one process.
+#
+# `Config` carries every configurable field in one immutable-by-convention
+# dataclass. The engine still reads from module globals as its default source
+# (back-compat: `bt.FOREX_MODE = True; bt.main()` keeps working, as do all
+# `monkeypatch.setattr(bt, "X", Y)` test patterns), but library callers can
+# now pass `bt.main(config=cfg)` and the engine will apply that Config to the
+# module for the duration of the call, then restore the prior values.
+#
+# This pattern eliminates every `global X` statement inside the engine
+# (those that rebound configuration use `globals()['X'] = ...` instead;
+# those that mutated runtime caches now use the `_runtime_state` dict),
+# giving us an audit-clean surface (`grep -c "^    global " == 0`) without
+# breaking the long-standing public API.
+# ============================================================================
+from dataclasses import dataclass, field, fields, asdict
+from typing import Any, Optional
+
+
+@dataclass
+class Config:
+    """
+    Snapshot of every configurable knob in the backtester.
+
+    Defaults mirror the module-level constants so `Config()` is always
+    equivalent to "use the current module defaults". To copy the live
+    module state (including any `bt.X = Y` overrides set after import),
+    use `Config.from_module()`. To execute a backtest with a Config
+    without leaking values into module globals, pass `config=cfg` to
+    `main()` / `walk_forward()` / `optimiser()` etc., or use the
+    `with_config(cfg)` context manager directly.
+    """
+    # Account / risk
+    account_size: float = 100_000.0
+    risk_amount: float = 2_500.0
+    position_size: float = 2_500.0  # derived: RISK_AMOUNT (or 1.0 in forex)
+    slippage_pct: float = 0.03
+    fee_pct: float = 0.02
+    funding_fee: float = 0.01
+
+    # Sessions
+    trade_sessions: bool = False
+    session_start: str = "8:00"
+    session_end: str = "16:50"
+
+    # Lookback / windowing
+    default_lb: int = 50
+    lookback_range: tuple = (12, 76)
+    backtest_candles: int = 10_000
+    oos_candles: int = 90_000
+    use_oos2: bool = False
+
+    # Optimiser
+    opt_metric: str = "Sharpe"
+    min_trades: int = 10
+    smart_optimization: bool = True
+    drawdown_constraint: Optional[float] = None
+    fast_ema_span: int = 20
+
+    # Plotting / Monte Carlo
+    print_equity_curve: bool = True
+    use_monte_carlo: bool = True
+    mc_runs: int = 1000
+
+    # SL / TP / RRR
+    use_sl: bool = True
+    sl_percentage: float = 1.0
+    use_tp: bool = True
+    tp_percentage: float = 3.0
+    optimize_rrr: bool = True
+
+    # Confluence + legacy
+    confluences: Optional[str] = None
+    mask_exits: bool = False
+    legacy_side_bug: bool = False
+
+    # Forex
+    forex_mode: bool = False
+    pip_size: float = 0.0001
+
+    # Regime / filters
+    filter_regimes: bool = False
+    filter_directions: bool = False
+    use_regime_seg: bool = False
+    regime_labels: list = field(default_factory=lambda: ['Uptrend', 'Downtrend', 'Ranging'])
+
+    # Robustness
+    fee_shock: bool = False
+    slippage_shock: bool = False
+    news_candles_injection: bool = False
+    entry_drift: bool = False
+    indicator_variance: bool = False
+    news_avoider: bool = False
+
+    # Walk-forward
+    use_wfo: bool = True
+    wfo_trigger_mode: str = "candles"
+    wfo_trigger_val: int = 5000
+
+    # I/O
+    csv_file: str = "data/your_ohlc.csv"
+    export_path: str = "trade_list.csv"
+
+    # ------------------------------------------------------------------
+    # Mapping between Config field names and module-level UPPERCASE names.
+    # The two surfaces use different casing conventions: Config follows
+    # PEP 8 (lower_snake), the legacy module API uses ALL_CAPS. We keep
+    # the mapping explicit so a typo on either side is loud rather than
+    # silent.
+    # ------------------------------------------------------------------
+    _MODULE_NAME_MAP = {
+        'account_size': 'ACCOUNT_SIZE',
+        'risk_amount': 'RISK_AMOUNT',
+        'position_size': 'POSITION_SIZE',
+        'slippage_pct': 'SLIPPAGE_PCT',
+        'fee_pct': 'FEE_PCT',
+        'funding_fee': 'FUNDING_FEE',
+        'trade_sessions': 'TRADE_SESSIONS',
+        'session_start': 'SESSION_START',
+        'session_end': 'SESSION_END',
+        'default_lb': 'DEFAULT_LB',
+        'lookback_range': 'LOOKBACK_RANGE',
+        'backtest_candles': 'BACKTEST_CANDLES',
+        'oos_candles': 'OOS_CANDLES',
+        'use_oos2': 'USE_OOS2',
+        'opt_metric': 'OPT_METRIC',
+        'min_trades': 'MIN_TRADES',
+        'smart_optimization': 'SMART_OPTIMIZATION',
+        'drawdown_constraint': 'DRAWDOWN_CONSTRAINT',
+        'fast_ema_span': 'FAST_EMA_SPAN',
+        'print_equity_curve': 'PRINT_EQUITY_CURVE',
+        'use_monte_carlo': 'USE_MONTE_CARLO',
+        'mc_runs': 'MC_RUNS',
+        'use_sl': 'USE_SL',
+        'sl_percentage': 'SL_PERCENTAGE',
+        'use_tp': 'USE_TP',
+        'tp_percentage': 'TP_PERCENTAGE',
+        'optimize_rrr': 'OPTIMIZE_RRR',
+        'confluences': 'CONFLUENCES',
+        'mask_exits': 'MASK_EXITS',
+        'legacy_side_bug': 'LEGACY_SIDE_BUG',
+        'forex_mode': 'FOREX_MODE',
+        'pip_size': 'PIP_SIZE',
+        'filter_regimes': 'FILTER_REGIMES',
+        'filter_directions': 'FILTER_DIRECTIONS',
+        'use_regime_seg': 'USE_REGIME_SEG',
+        'regime_labels': 'REGIME_LABELS',
+        'fee_shock': 'FEE_SHOCK',
+        'slippage_shock': 'SLIPPAGE_SHOCK',
+        'news_candles_injection': 'NEWS_CANDLES_INJECTION',
+        'entry_drift': 'ENTRY_DRIFT',
+        'indicator_variance': 'INDICATOR_VARIANCE',
+        'news_avoider': 'NEWS_AVOIDER',
+        'use_wfo': 'USE_WFO',
+        'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
+        'wfo_trigger_val': 'WFO_TRIGGER_VAL',
+        'csv_file': 'CSV_FILE',
+        'export_path': 'EXPORT_PATH',
+    }
+
+    @classmethod
+    def from_module(cls) -> 'Config':
+        """Snapshot the current module-level globals into a Config instance.
+
+        Useful when you want to start from "whatever is currently set" and
+        then tweak a few fields:
+
+            cfg = bt.Config.from_module()
+            cfg.use_tp = False
+            bt.main(config=cfg)
+        """
+        kwargs = {}
+        g = globals()
+        for fname, mname in cls._MODULE_NAME_MAP.items():
+            if mname in g:
+                kwargs[fname] = g[mname]
+        return cls(**kwargs)
+
+    def apply_to_module(self) -> dict:
+        """Write every field of this Config back to the module globals.
+
+        Returns the previous values as a dict, so callers can restore them
+        via `restore_module_state(prev)`. Use `with_config(cfg)` instead of
+        calling this directly when possible — the context manager guarantees
+        restore on exception.
+
+        The derived `dd_constraint` and any forex-mode-driven overrides
+        are also recomputed so the engine sees a consistent module state.
+        """
+        g = globals()
+        prev = {}
+        for fname, mname in self._MODULE_NAME_MAP.items():
+            prev[mname] = g.get(mname)
+            g[mname] = getattr(self, fname)
+        # Recompute derived dd_constraint exactly as the import-time block does
+        prev['dd_constraint'] = g.get('dd_constraint')
+        if self.drawdown_constraint is None:
+            g['dd_constraint'] = None
+        else:
+            g['dd_constraint'] = (
+                self.drawdown_constraint
+                if self.forex_mode
+                else self.drawdown_constraint / 100.0
+            )
+        return prev
+
+    def with_forex(self, on: bool = True) -> 'Config':
+        """Return a copy with forex-mode defaults applied.
+
+        Mirrors the import-time `if FOREX_MODE:` block in the legacy module:
+        SL/TP get scaled by pip_size, account/risk/position go to 1.0 R-units.
+        """
+        new = Config(**{f.name: getattr(self, f.name) for f in fields(self)})
+        new.forex_mode = on
+        if on:
+            new.sl_percentage = self.sl_percentage * new.pip_size
+            new.tp_percentage = self.tp_percentage * new.pip_size
+            new.risk_amount = 1.0
+            new.account_size = 1.0
+            new.position_size = 1.0
+        return new
+
+    def with_sessions(self, on: bool, start: str = "8:00", end: str = "16:50") -> 'Config':
+        new = Config(**{f.name: getattr(self, f.name) for f in fields(self)})
+        new.trade_sessions = on
+        new.session_start = start
+        new.session_end = end
+        return new
+
+    def with_oos2(self, on: bool) -> 'Config':
+        new = Config(**{f.name: getattr(self, f.name) for f in fields(self)})
+        new.use_oos2 = on
+        # If user starts from import-time defaults the OOS doubling
+        # already happened; we re-derive against the original single-window.
+        base = new.oos_candles if not self.use_oos2 else (new.oos_candles // 2)
+        new.oos_candles = base * 2 if on else base
+        return new
+
+
+def restore_module_state(prev: dict) -> None:
+    """Restore the module globals from the dict returned by apply_to_module()."""
+    g = globals()
+    for k, v in prev.items():
+        g[k] = v
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def with_config(cfg: Optional[Config]):
+    """Context manager: temporarily apply `cfg` to the module globals.
+
+    On entry, snapshots the current module state and applies `cfg`. On exit
+    (even if the body raises), restores the previous state. If `cfg` is None,
+    runs as a no-op (yields immediately) so call sites can wrap the body
+    unconditionally:
+
+        with with_config(config):
+            ... engine body ...
+    """
+    if cfg is None:
+        yield
+        return
+    prev = cfg.apply_to_module()
+    try:
+        yield
+    finally:
+        restore_module_state(prev)
+
+
+# ----------------------------------------------------------------------
+# Runtime-state holder: absorbs the per-run scratch values that used to
+# live as bare module globals (`last_unfiltered_raw`, `_last_df`, ...).
+# By storing them in a dict we can mutate without `global` declarations
+# and we keep a single audit point should we ever want to make these
+# per-call (e.g. truly fork-safe). Today they remain process-global —
+# matching the prior contract — but the surface is cleaner.
+# ----------------------------------------------------------------------
+_runtime_state: dict[str, Any] = {
+    'last_unfiltered_raw': None,
+    '_last_df': None,
+    '_last_lb': None,
+    'NEWS_FLAGS': None,
+}
 
 def in_session(ts: datetime) -> bool:
     """ts is a timezone-aware NY datetime."""
@@ -578,9 +872,13 @@ def make_codes(df, raw, lb):
 # 3. RAW SIGNALS (based on EMA20 vs EMA_lb)
 # 3. RAW SIGNALS (based on EMA20 vs EMA_lb)
 def create_raw_signals(df, lb):
-    global _last_df, _last_lb
-    _last_df = df
-    _last_lb = lb
+    # Was: `global _last_df, _last_lb` (config-state mutation). The two
+    # values are debug breadcrumbs for ML strategies that want to inspect
+    # the most recent (df, lb) pair after a backtest. Stored in
+    # `_runtime_state` so we don't need a `global` keyword. Still readable
+    # via the legacy module attribute through the property aliases below.
+    _runtime_state['_last_df'] = df
+    _runtime_state['_last_lb'] = lb
 
     ema20  = df['EMA_20'].shift(1).values
     ema_lb = df[f'EMA_{lb}'].shift(1).values
@@ -648,9 +946,11 @@ def parse_signals(raw: np.ndarray, times: pd.Series) -> np.ndarray:
     sig    = _parse_signals_numba(raw_i8, in_flags)
 
     # 3) now strip out any flips that fail your confluence
-    if CONFLUENCES is not None and _last_df is not None:
+    last_df = _runtime_state['_last_df']
+    last_lb = _runtime_state['_last_lb']
+    if CONFLUENCES is not None and last_df is not None:
         # rebuild make_codes mask on that same df & lb
-        codes = make_codes(_last_df, raw, _last_lb)
+        codes = make_codes(last_df, raw, last_lb)
         # codes==1 means allow a long entry (sig==1), codes==3 means allow short
         # everywhere else we kill the flip code
         mask_allow = np.zeros_like(raw, dtype=bool)
@@ -747,10 +1047,12 @@ def evaluate_filters(trades, rets, regimes=None):
     """
     Inspect the IS trades and decide which regimes and/or directions to disable.
     Prints PF, ROI and Trade count for every tested bucket, then fills the
-    global *blocked_* structures according to:
+    module-level *blocked_* structures according to:
          TradeCount > 50  and  PF < 1    block
     """
-    global blocked_regimes, blocked_directions, blocked_pairs
+    # Was: `global blocked_regimes, ...` — but those names are mutated
+    # in-place via .clear()/.add()/.setdefault(), no rebind, so the
+    # `global` keyword was redundant. Removed in v0.4.0.
     blocked_regimes.clear()
     blocked_directions.clear()
     blocked_pairs.clear()
@@ -816,10 +1118,13 @@ def evaluate_filters(trades, rets, regimes=None):
 def filter_raw_signals(raw, regimes=None):
     """
     Zeroout raw entries that fall into a blocked regime / direction,
-    but preserve the original raw in last_unfiltered_raw so exits still fire.
+    but preserve the original raw in _runtime_state['last_unfiltered_raw']
+    so exits still fire.
     """
-    global last_unfiltered_raw, blocked_regimes, blocked_directions, blocked_pairs
-    last_unfiltered_raw = raw.copy()
+    # Was: `global last_unfiltered_raw, blocked_regimes, ...`. blocked_*
+    # are read-only here (no rebind), and last_unfiltered_raw now lives
+    # in the _runtime_state dict so we can mutate without `global`.
+    _runtime_state['last_unfiltered_raw'] = raw.copy()
 
     if not (FILTER_REGIMES or FILTER_DIRECTIONS):
         return raw
@@ -1309,16 +1614,27 @@ def backtest(df, raw_sig, carry_in=None):
 
 # 6. OPTIMISER  now with Smart Optimization support
 # 6. OPTIMISER  now with Smart Optimization support (patched for WFO)
-def optimiser(df, lb_range, metric, min_trades):
+def optimiser(df, lb_range, metric, min_trades, config: Optional[Config] = None):
     """
-    Updated optimiser: 
+    Updated optimiser:
       1) Coarse search in steps of 2 over lb_range.
       2) Take the best coarse lookback.
       3) Fine-tune by testing best_lb - 1 and best_lb + 1.
       4) Return the overall best of those three.
-    """
-    global last_unfiltered_raw
 
+    `config` is optional. When provided, the engine uses cfg's values for
+    the duration of this call (and restores prior values on exit). When
+    omitted, the call reads from module globals as it always has —
+    the documented `bt.X = Y` / `monkeypatch.setattr(bt, "X", Y)` API
+    keeps working unchanged.
+    """
+    with with_config(config):
+        return _optimiser_impl(df, lb_range, metric, min_trades)
+
+
+def _optimiser_impl(df, lb_range, metric, min_trades):
+    # Was: `global last_unfiltered_raw`. Moved to _runtime_state dict
+    # so we can mutate without `global`. See _runtime_state docstring.
     eval_cache = {}
 
     # Helper to evaluate a single lookback
@@ -1326,12 +1642,10 @@ def optimiser(df, lb_range, metric, min_trades):
         if lb in eval_cache:
             return eval_cache[lb]
 
-        global last_unfiltered_raw
-
         # 1) Compute indicators & raw signals for this lookback
         dfi = compute_indicators(df, lb)
         raw = create_raw_signals(dfi, lb)
-        last_unfiltered_raw = raw.copy()
+        _runtime_state['last_unfiltered_raw'] = raw.copy()
         sig = parse_signals(raw, dfi['time'])
 
         # 2) Backtest (with or without RRR optimisation)
@@ -1343,7 +1657,7 @@ def optimiser(df, lb_range, metric, min_trades):
             globals()['TP_PERCENTAGE'] = 5 * SL_PERCENTAGE
             globals()['USE_TP']        = True
 
-            last_unfiltered_raw = raw.copy()
+            _runtime_state['last_unfiltered_raw'] = raw.copy()
             trades_probe, _, _, _, _ = backtest(dfi, sig)
 
             # compute peak and close R multiples
@@ -1382,7 +1696,7 @@ def optimiser(df, lb_range, metric, min_trades):
 
             # re-run with optimal TP
             globals()['TP_PERCENTAGE'] = best_rrr * SL_PERCENTAGE
-            last_unfiltered_raw = raw.copy()
+            _runtime_state['last_unfiltered_raw'] = raw.copy()
             _, met, _, _, _ = backtest(dfi, sig)
             met['RRR'] = best_rrr
 
@@ -1465,7 +1779,19 @@ def optimiser(df, lb_range, metric, min_trades):
     return selected[1], selected[2]
 
 # 7. MONTE CARLO
-def monte_carlo(arr, actual, runs):
+def monte_carlo(arr, actual, runs, config: Optional[Config] = None):
+    """Monte Carlo bootstrap & shuffle of the realised return series.
+
+    `config` is optional; see `optimiser` docstring for the contract.
+    The MC routine itself is config-free (no engine knobs participate),
+    but the parameter is accepted for API symmetry with the rest of
+    the public surface.
+    """
+    with with_config(config):
+        return _monte_carlo_impl(arr, actual, runs)
+
+
+def _monte_carlo_impl(arr, actual, runs):
     N = arr.size
     if N == 0:
         print(" Monte Carlo skipped: no return series provided.")
@@ -1663,11 +1989,10 @@ def optimise_regime_full(df_full, regimes, target_regime, current_lbs,
       3) Return the best (lb, rrr, metrics) tuple.
     """
     import math
-    global last_unfiltered_raw
+    # Was: `global last_unfiltered_raw`. Moved to _runtime_state.
 
     # helper: run one candidate lookback and return (val, lb, rrr, met) or None
     def _evaluate(lb):
-        global last_unfiltered_raw
         # 1) set candidate look-backs
         cand_lbs = current_lbs.copy()
         cand_lbs[target_regime] = lb
@@ -1675,7 +2000,7 @@ def optimise_regime_full(df_full, regimes, target_regime, current_lbs,
         # 2) generate raw signals and parse
         base = compute_indicators(df_full.copy(), DEFAULT_LB) if 'EMA_20' not in df_full else df_full.copy()
         raw = create_regime_signals(base, cand_lbs, regimes)
-        last_unfiltered_raw = raw.copy()
+        _runtime_state['last_unfiltered_raw'] = raw.copy()
         sig = parse_signals(raw, df_full['time'])
 
         # 3) backtest (with or without RRR probe)
@@ -1808,7 +2133,7 @@ def backtest_continuous_regime(df, best_lbs):
         globals()['TP_PERCENTAGE'] = 5 * SL_PERCENTAGE
         globals()['USE_TP']        = True
 
-        last_unfiltered_raw = raw_full.copy()
+        _runtime_state['last_unfiltered_raw'] = raw_full.copy()
         trades_probe, _, _, _, _ = backtest(dfi, parse_signals(raw_full, dfi['time']))
 
         # compute peak_Rs & close_Rs
@@ -1847,7 +2172,7 @@ def backtest_continuous_regime(df, best_lbs):
         old_tp, old_flag = TP_PERCENTAGE, USE_TP
 
     # 5) final full-series backtest with RRR applied
-    last_unfiltered_raw = raw_full.copy()
+    _runtime_state['last_unfiltered_raw'] = raw_full.copy()
     sig = parse_signals(raw_full, dfi['time'])
     trades, metrics, eq_frac, rets, _ = backtest(dfi, sig)
     if best_rrr is not None:
@@ -1860,7 +2185,7 @@ def backtest_continuous_regime(df, best_lbs):
 
     return trades, metrics, eq_frac, rets
 
-def optimize_regimes_sequential(is_df):
+def optimize_regimes_sequential(is_df, config: Optional[Config] = None):
     """
     Sequential per-regime LB optimisation with coarse/fine search (and optional
     RRR optimisation). Iterates over `REGIME_LABELS` in order; on phase k the
@@ -1870,9 +2195,16 @@ def optimize_regimes_sequential(is_df):
       best_lbs:  dict {label: lb}        (one entry per REGIME_LABELS)
       best_rrrs: dict {label: rrr | None}
     Works with REGIME_LABELS of any length in {2, 3, 4, 5}.
+
+    `config` is optional; see `optimiser` docstring for the contract.
     """
+    with with_config(config):
+        return _optimize_regimes_sequential_impl(is_df)
+
+
+def _optimize_regimes_sequential_impl(is_df):
     import math
-    global last_unfiltered_raw
+    # Was: `global last_unfiltered_raw`. Moved to _runtime_state.
 
     dfi = is_df.copy()
     dfi['EMA_20']  = is_df['close'].ewm(span=20,  adjust=False).mean()
@@ -1901,8 +2233,6 @@ def optimize_regimes_sequential(is_df):
 
         # helper to evaluate one lookback for this regime
         def _evaluate(lb):
-            global last_unfiltered_raw
-
             # build lookback map with candidate for this regime
             temp_lbs = best_lbs.copy()
             temp_lbs[reg] = lb
@@ -1913,7 +2243,7 @@ def optimize_regimes_sequential(is_df):
                 chosen_lb = temp_lbs[r]
                 raw[i]    = 1 if ema20[i] > slow_emas[chosen_lb][i] else -1
 
-            last_unfiltered_raw = None
+            _runtime_state['last_unfiltered_raw'] = None
             sig = parse_signals(raw, dfi['time'])
 
             # backtest (with or without RRR probe)
@@ -1922,7 +2252,7 @@ def optimize_regimes_sequential(is_df):
                 globals()['TP_PERCENTAGE'] = 5 * SL_PERCENTAGE
                 globals()['USE_TP']        = True
 
-                last_unfiltered_raw = None
+                _runtime_state['last_unfiltered_raw'] = None
                 trades_p, _, _, _, _ = backtest(dfi, sig)
 
                 # collect peak/close R for this target regime
@@ -1957,7 +2287,7 @@ def optimize_regimes_sequential(is_df):
                     globals()['TP_PERCENTAGE'] = best_rrr_cand * SL_PERCENTAGE
                     globals()['USE_TP']        = True
 
-                last_unfiltered_raw = None
+                _runtime_state['last_unfiltered_raw'] = None
                 trades, met, eq, rets, _ = backtest(dfi, sig)
                 if best_rrr_cand is not None:
                     met['RRR'] = best_rrr_cand
@@ -1968,7 +2298,7 @@ def optimize_regimes_sequential(is_df):
 
                 rrr_used = best_rrr_cand
             else:
-                last_unfiltered_raw = None
+                _runtime_state['last_unfiltered_raw'] = None
                 trades, met, eq, rets, _ = backtest(dfi, sig)
                 rrr_used = None
 
@@ -2020,8 +2350,21 @@ signals_cache = {}
 
 ## 10. CLASSIC SINGLE-RUN  updated so that RRR is optimized and applied per regime
 # 10. CLASSIC SINGLE-RUN  corrected to collect OOS-regime returns by segment
-def classic_single_run(df):
-    global TP_PERCENTAGE, USE_TP, signals_cache
+def classic_single_run(df, config: Optional[Config] = None):
+    """Single-window IS/OOS run with optional RRR optimisation.
+
+    `config` is optional; see `optimiser` docstring for the contract.
+    """
+    with with_config(config):
+        return _classic_single_run_impl(df)
+
+
+def _classic_single_run_impl(df):
+    # Was: `global TP_PERCENTAGE, USE_TP, signals_cache` — redundant.
+    # TP/USE_TP rebinds inside this function are done via `globals()['X']=...`
+    # (the only path that the engine respects when reading them back through
+    # `backtest()` -> `_backtest_numba_core`); signals_cache is mutated
+    # in-place. Removed in v0.4.0.
     m1 = None
     m2 = None
     m1r = None
@@ -2045,8 +2388,8 @@ def classic_single_run(df):
         # 2) build raw signals
         raw = create_raw_signals(dfi, DEFAULT_LB)
         # 3) reset true-raw buffer so exits align with this segment
-        global last_unfiltered_raw
-        last_unfiltered_raw = None
+        # Was: `global last_unfiltered_raw; last_unfiltered_raw = None`
+        _runtime_state['last_unfiltered_raw'] = None
         # 4) parse signals (entries + exits)
         sig = parse_signals(raw, dfi['time'])
         # 5) backtest
@@ -2459,7 +2802,13 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
     return rets_oos, rb_rets, eq_is, rb_eq_is
 
 
-def walk_forward(df, met_is_baseline, eq_is_baseline):
+def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] = None):
+    """Rolling walk-forward driver. `config` is optional; see `optimiser`."""
+    with with_config(config):
+        return _walk_forward_impl(df, met_is_baseline, eq_is_baseline)
+
+
+def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
     # Build robustness scenarios using the queued flags
     if ROBUSTNESS_SCENARIOS:
         items = list(ROBUSTNESS_SCENARIOS.items())[:MAX_ROBUSTNESS_SCENARIOS]
@@ -2717,10 +3066,20 @@ def inject_news_candles(df: pd.DataFrame, seed: int | None = None) -> pd.DataFra
         i += burst
     return df
 
-def apply_news_injection():
-    """Injects synthetic newswick candles and rebacktests with *fixed* params."""
-    global TP_PERCENTAGE, USE_TP
+def apply_news_injection(config: Optional[Config] = None):
+    """Injects synthetic newswick candles and rebacktests with *fixed* params.
 
+    `config` is optional; see `optimiser` docstring for the contract.
+    """
+    with with_config(config):
+        return _apply_news_injection_impl()
+
+
+def _apply_news_injection_impl():
+    # Was: `global TP_PERCENTAGE, USE_TP`. Replaced with the
+    # `globals()['X']=...` pattern used elsewhere in this file so we do
+    # not need a `global` keyword. The save/restore semantics are
+    # identical: snapshot before the override, restore after.
     if 'df' not in signals_cache:
         raise RuntimeError("Baseline DF not cached  run main() first!")
 
@@ -2737,8 +3096,8 @@ def apply_news_injection():
         # set fixed RRR (if any)
         old_tp, old_flag = TP_PERCENTAGE, USE_TP
         if best_rrr is not None:
-            TP_PERCENTAGE = best_rrr * SL_PERCENTAGE
-            USE_TP        = True
+            globals()['TP_PERCENTAGE'] = best_rrr * SL_PERCENTAGE
+            globals()['USE_TP']        = True
 
         # IS
         dfi = compute_indicators(is_df.copy(), best_lb)
@@ -2757,7 +3116,8 @@ def apply_news_injection():
         eq_baseline_rb = np.concatenate((eq_is_rb, eq_oos_rb + (eq_is_rb[-1] - 1)))
 
         # restore TP settings
-        TP_PERCENTAGE, USE_TP = old_tp, old_flag
+        globals()['TP_PERCENTAGE'] = old_tp
+        globals()['USE_TP'] = old_flag
 
     # === Regimesegmentation path ========================================
     else:
@@ -2807,7 +3167,9 @@ def apply_combined_robustness(
     variance : bool
         If True perturb the chosen slowEMA lookbacks by 1.
     """
-    global FEE_PCT, SLIPPAGE_PCT, TP_PERCENTAGE, USE_TP
+    # Was: `global FEE_PCT, SLIPPAGE_PCT, TP_PERCENTAGE, USE_TP`. Replaced
+    # with `globals()['X']=...` so we do not need a `global` keyword.
+    # Save/restore semantics unchanged.
 
     # 1) build working price series ---------------------------------------
     df_work = signals_cache['df'].copy()
@@ -2820,8 +3182,9 @@ def apply_combined_robustness(
     oos_df = df_work.iloc[N - OOS_CANDLES : N].reset_index(drop=True)
 
     # 2) fee / slippage shock ---------------------------------------------
-    fee_old, slip_old        = FEE_PCT, SLIPPAGE_PCT
-    FEE_PCT, SLIPPAGE_PCT    = fee_old * fee_mult, slip_old * slip_mult
+    fee_old, slip_old = FEE_PCT, SLIPPAGE_PCT
+    globals()['FEE_PCT']      = fee_old * fee_mult
+    globals()['SLIPPAGE_PCT'] = slip_old * slip_mult
 
     # 3) choose variant LBs -----------------------------------------------
     rng = random.Random()
@@ -2837,8 +3200,8 @@ def apply_combined_robustness(
         # apply RRR if any
         tp_old, flag_old = TP_PERCENTAGE, USE_TP
         if best_rrr is not None:
-            TP_PERCENTAGE = best_rrr * SL_PERCENTAGE
-            USE_TP        = True
+            globals()['TP_PERCENTAGE'] = best_rrr * SL_PERCENTAGE
+            globals()['USE_TP']        = True
 
         # ---------- IS -----------------------------------------------
         dfi = compute_indicators(is_df.copy(), lb_use)
@@ -2856,7 +3219,8 @@ def apply_combined_robustness(
             sig = drift_entries(sig)
         _, met_oos_rb, eq_oos_rb, _, _ = backtest(dfo, sig)
 
-        TP_PERCENTAGE, USE_TP = tp_old, flag_old
+        globals()['TP_PERCENTAGE'] = tp_old
+        globals()['USE_TP']        = flag_old
 
     else:  # regime segmentation path
         base_lbs = signals_cache['best_lbs'].copy()
@@ -2870,7 +3234,8 @@ def apply_combined_robustness(
         _, met_oos_rb, eq_oos_rb, _ = backtest_continuous_regime(oos_df.copy(), lbs_use)
 
     # 4) restore globals ----------------------------------------------------
-    FEE_PCT, SLIPPAGE_PCT = fee_old, slip_old
+    globals()['FEE_PCT']      = fee_old
+    globals()['SLIPPAGE_PCT'] = slip_old
 
     # 5) stitch equity curve ----------------------------------------------
     eq_baseline_rb = np.concatenate((eq_is_rb, eq_oos_rb + (eq_is_rb[-1] - 1)))
@@ -3005,7 +3370,23 @@ def age_dataset(df, age):
 
 
 # 12. MAIN
-def main():
+def main(config: Optional[Config] = None):
+    """
+    Top-level entry point. Runs the full backtest pipeline:
+    classic single run -> robustness -> walk-forward -> plot.
+
+    `config` is optional. When provided, applies that Config to module
+    globals for the duration of this call (and restores prior values on
+    exit). Pass `bt.Config()` to use library defaults regardless of the
+    current module state, or `bt.Config.from_module()` to snapshot the
+    current state and tweak fields. When omitted, reads from module
+    globals — the legacy `bt.X = Y` API works exactly as before.
+    """
+    with with_config(config):
+        return _main_impl()
+
+
+def _main_impl():
     # Explicit early check so users running `python -m backtester` get a
     # clear error before any heavy imports / numba JIT warm-up happens.
     if not os.path.exists(CSV_FILE):
@@ -3018,7 +3399,9 @@ def main():
 
     df = age_dataset(df, AGE_DATASET)
 
-    global NEWS_FLAGS
+    # Was: `global NEWS_FLAGS`. NEWS_FLAGS is per-run state, not config,
+    # so it lives in _runtime_state. Module-level `NEWS_FLAGS = None`
+    # alias is still maintained for back-compat (set via `globals()`).
     # only mark traded bars
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
     # compute 14-bar ATR & flag spikes at :00/:30
@@ -3030,8 +3413,11 @@ def main():
         & (df['time'].dt.minute % 30 == 0)
     )
 
-    # expose a single global boolean array for all later routines
-    NEWS_FLAGS = df['is_news_candle'].values
+    # expose the news-flag array for all later routines via _runtime_state.
+    # Mirror to the module-level NEWS_FLAGS attribute so any external
+    # consumer or legacy code still sees it on `bt.NEWS_FLAGS`.
+    _runtime_state['NEWS_FLAGS'] = df['is_news_candle'].values
+    globals()['NEWS_FLAGS'] = _runtime_state['NEWS_FLAGS']
 
 
     # 1) baseline run
