@@ -6,3 +6,4 @@ numba
 pytz
 requests
 hypothesis
+scikit-learn   # for examples/ml_sklearn/ + examples/ml_regime_kmeans/
