@@ -1,12 +1,14 @@
 cff-version: 1.2.0
 message: "If you use this software in academic or research work, please cite it as below."
-title: "quant-research-framework: a walk-forward backtester with strict no-look-ahead property tests and cross-language parity"
+title: "quant-research-framework: a walk-forward backtester with ledger invariant tests and tolerance-bounded cross-language parity"
 type: software
 authors:
   - family-names: "Vieira Gatto"
     given-names: "Daniel"
     alias: "DaruFinance"
     email: "77agdg@gmail.com"
+version: "0.3.0"
+date-released: "2026-05-03"
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
 url: "https://doi.org/10.5281/zenodo.19798594"
 doi: 10.5281/zenodo.19798594

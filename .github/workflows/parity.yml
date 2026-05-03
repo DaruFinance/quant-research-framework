@@ -74,3 +74,19 @@ jobs:
       - name: Parity — forex mode (56 metric points, EURUSD 1h)
         working-directory: quant-research-framework-rs
         run: python tools/parity_forex.py --csv data/EURUSD_1h.csv --tol 0.001
+
+      - name: Parity — ledger row-by-row (SOLUSDT 1h)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_ledger.py --csv data/SOLUSDT_1h.csv --tol 0.001
+
+      - name: Parity — default config on BTC 30m (146k bars)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_check.py --csv data/BTCUSDT_30m.csv --tol 0.001
+
+      - name: Parity — default config on DOGE 30m (117k bars)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_check.py --csv data/DOGEUSDT_30m.csv --tol 0.001
+
+      - name: Parity — default config on 100k synthetic GBM
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_check.py --csv data/SYNTH_100k.csv --tol 0.001

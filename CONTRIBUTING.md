@@ -19,9 +19,9 @@ to merge.
 
 If your change is **not** intended to alter outputs (refactor, docs,
 type hints, a faster but equivalent indicator implementation), the
-parity diff must still pass byte-for-byte where it currently does and
-within the $10^{-3}$ band where it didn't. Run the four-command checklist
-below before opening a PR.
+parity diff must still report metric agreement within the $10^{-3}$
+relative tolerance band on the surfaces it currently passes. Run the
+four-command checklist below before opening a PR.
 
 ## Four-command verification checklist
 
@@ -57,7 +57,7 @@ automatically on push.
   `backtester/indicators.py` after the v0.3.0 package decomposition),
   matching TradingView's reference output where possible.
 - **Performance** improvements to the Numba core that are
-  semantically identical (parity diff still passes byte-for-byte).
+  semantically identical (parity diff still passes within $10^{-3}$).
 - **Tests** under `tests/`, especially new property-based invariants on
   the strategy contract.
 - **Documentation** of any kind. The framework is under-documented

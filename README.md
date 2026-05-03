@@ -126,7 +126,8 @@ Optional scenarios such as:
 
 The framework follows [Semantic Versioning](https://semver.org/). See
 [`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
-`__version__` constant in `backtester.py` is the source of truth.
+`version` field in [`pyproject.toml`](pyproject.toml) is the source of
+truth (currently `0.3.0`, `paper-v2` retag).
 
 ---
 
@@ -150,13 +151,22 @@ A 1-to-1 Rust port of this backtester is available at
 [**DaruFinance/quant-research-framework-rs**](https://github.com/DaruFinance/quant-research-framework-rs).
 Same strategy logic, same metrics, same WFO/robustness pipeline. The
 Rust port reproduces every IS/OOS/baseline/optimised/WFO metric line
-byte-for-byte against this Python reference on two independent surfaces:
+within `1e-3` relative tolerance against this Python reference on three
+independent surfaces:
 
-- **Default config (56/56 metric points byte-identical at 0.001 tol)** — verified by
+- **Default config (56/56 metric points)** — verified by
   [`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py).
-- **Regime + WFO (14/14 metric tags byte-identical at 0.001 tol)** — verified
-  by [`tools/parity_regime.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_regime.py)
-  as of the Rust port's v0.3.0 release.
+- **Regime + WFO (98/98 metric points)** — verified by
+  [`tools/parity_regime.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_regime.py)
+  on the Rust port's v0.3.2 release.
+- **Forex mode (56/56 metric points on EURUSD 1h)** — verified by
+  [`tools/parity_forex.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_forex.py).
+
+Total: 210 / 210 metric points across 30 stages. Maximum observed
+relative deviation is below `5e-5` (the metric ledger's `%.4f`
+print precision floor), 20× tighter than the declared `1e-3` tolerance.
+We avoid the term *byte-identical* throughout: parity is
+tolerance-bounded by construction, not bit-equality.
 
 It runs **25–60× faster** and uses **~37× less memory**:
 
@@ -187,10 +197,11 @@ not (verified against primary docs as of 2026-04):
 | [bt][btp]              | MIT                      | ✗            | ✗                          | ✗                         | n/a                              |
 
 The **combination** is the contribution: WFO + per-regime LB + strict
-no-look-ahead enforced by property tests + a Python reference and Rust
-port whose outputs agree byte-for-byte on the deterministic pipeline.
-Each cell individually exists somewhere; no other framework ships the
-whole bundle.
+no-look-ahead enforced by ledger-level invariant tests + a Python
+reference and Rust port whose metric outputs agree within $10^{-3}$
+relative tolerance on three deterministic surfaces (210 / 210 metric
+points across 30 stages). Each cell individually exists somewhere; no
+other framework ships the whole bundle.
 
 [vbt]: https://github.com/polakowo/vectorbt
 [bt]:  https://github.com/mementum/backtrader
