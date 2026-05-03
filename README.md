@@ -1,7 +1,11 @@
 # Quant Research Backtester (Walk-Forward + Robustness)
 
+[![parity](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml)
+[![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
+[![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798594.svg)](https://doi.org/10.5281/zenodo.19798594)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
 
 Research-grade Python framework for evaluating systematic trading strategies using walk-forward optimization, statistical validation, and robustness testing.
 
@@ -35,22 +39,57 @@ Note: the framework was repackaged from a single `backtester.py` script into a `
 
 ---
 
-## What’s Included
+## What's Included
 
-- **`backtester.py`**  
-  Main research backtester: in-sample (IS) vs out-of-sample (OOS), optional rolling walk-forward optimization, realism controls, metrics, plots.
+- **`backtester/`** — the engine package, restructured in v0.3.0 from the
+  legacy single-file `backtester.py` script. Sub-modules:
+  - `backtester/__init__.py` — the engine: IS / OOS / WFO + robustness
+    overlays + Monte Carlo + trade ledger export.
+  - `backtester/__main__.py` — `python -m backtester` CLI entry point.
+  - `backtester/indicators.py` — TradingView-style indicator helpers
+    (EMA, SMA, RSI, ATR, MACD, Stochastic).
+  - `backtester/dsr.py` — Bailey & López de Prado (2014) Deflated Sharpe
+    Ratio utility.
 
-- **`binance_ohlc_downloader.py`**  
-  Utility to download and format OHLC candles from Binance into the CSV format expected by the backtester.
+- **`binance_ohlc_downloader.py`** — download and format Binance OHLC
+  candles into the CSV format the engine reads.
 
-- **`gen_synthetic.py`**  
-  GBM-based synthetic OHLC generator. No network required — use it for smoke-testing or reproducible demos. Writes `data/SYNTHETIC.csv` in the same format the Binance downloader emits.
+- **`gen_synthetic.py`** — GBM-based synthetic OHLC generator. No
+  network required; writes `data/SYNTHETIC.csv` in the same format the
+  Binance downloader emits.
 
-- **`indicators_tradingview.py`**  
-  Helper indicator functions used by the backtester (EMA/SMA/RSI/ATR/etc., depending on your implementation).
+- **`indicators_tradingview.py`** — backwards-compatibility shim that
+  re-exports `backtester.indicators`. Pre-v0.3.0 user scripts that do
+  `from indicators_tradingview import compute_atr` keep working unchanged.
 
-- **`examples/`**  
-  Tutorial folder showing how to plug a custom strategy into the pipeline. Includes `atr_cross/atr_cross.py` (ATR-cross with an RSI ≥ 50 confluence) and a [`README.md`](examples/README.md) that walks through the raw-signals contract.
+- **`examples/`** — strategy and ML examples + parallel runner + the
+  walkthrough notebook:
+  - [`examples/atr_cross/`](examples/atr_cross) — ATR-cross with an
+    RSI ≥ 50 confluence (worked-example strategy).
+  - [`examples/regime_custom/`](examples/regime_custom) — three
+    pluggable regime detectors (vol2, vol4, ml5).
+  - [`examples/ml_precomputed/`](examples/ml_precomputed) and
+    [`examples/ml_callback/`](examples/ml_callback) — two ML-strategy
+    integration patterns against the `(df, lb) -> int8[]` contract.
+  - [`examples/ml_sklearn/`](examples/ml_sklearn) — scikit-learn
+    classifier wired into the strategy contract.
+  - [`examples/ml_regime_kmeans/`](examples/ml_regime_kmeans) —
+    KMeans-based regime detector matching the `detect_regimes()` API.
+  - [`examples/batch_runner/`](examples/batch_runner) — multiprocess
+    runner for sweeping a parameter grid in parallel.
+  - [`examples/notebook/walkthrough.ipynb`](examples/notebook/walkthrough.ipynb)
+    — the 10-cell tour referenced by the Binder badge above.
+  - [`examples/README.md`](examples/README.md) — the `(df, lb)` raw-signal
+    contract spelled out.
+
+- **`docs/`** — Sphinx + autodoc API reference (Furo theme), built and
+  published to GitHub Pages by `.github/workflows/docs.yml`.
+
+- **`tests/`** — pytest suite (32 tests, including Hypothesis property
+  tests on `parse_signals` and `walk_forward_regime` invariants).
+
+- **`binder/`** — Binder configuration (`requirements.txt`,
+  `runtime.txt`) for the launchable notebook.
 
 ---
 

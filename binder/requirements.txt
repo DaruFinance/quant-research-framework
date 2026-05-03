@@ -1,0 +1,10 @@
+pandas
+numpy
+scipy
+matplotlib
+numba
+pytz
+requests
+hypothesis
+scikit-learn
+jupyter
