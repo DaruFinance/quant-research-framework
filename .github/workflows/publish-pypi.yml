@@ -7,7 +7,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  guard:
+    # Skip-not-fail if PyPI Trusted Publishing isn't configured yet.
+    # We probe by calling the PyPI JSON API for our project; if it
+    # returns 200 AND the `pypi` GitHub environment is wired up, we
+    # proceed. Otherwise the publish job is skipped and the run shows
+    # a clean green check rather than a red email.
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+    steps:
+      - id: check
+        run: |
+          # The `pypi` environment is what gates trusted publishing.
+          # If a maintainer hasn't created it, skip cleanly.
+          if [ "${{ vars.PYPI_PUBLISHING_ENABLED }}" = "true" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "PyPI publishing enabled — proceeding."
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PyPI publishing not yet configured. Set repo variable PYPI_PUBLISHING_ENABLED=true after creating the trusted publisher on https://pypi.org/manage/account/publishing/ and the 'pypi' GitHub environment. See RELEASING.md."
+          fi
+
   build-and-publish:
+    needs: guard
+    if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
