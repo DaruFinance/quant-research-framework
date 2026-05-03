@@ -23,7 +23,7 @@ from math import sqrt
 from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
-from indicators_tradingview import compute_atr, compute_rsi
+from .indicators import compute_atr, compute_rsi
 from numba import njit, types
 from numba.typed import List
 

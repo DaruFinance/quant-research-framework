@@ -3,8 +3,10 @@ message: "If you use this software in academic or research work, please cite it 
 title: "quant-research-framework: a walk-forward backtester with strict no-look-ahead property tests and cross-language parity"
 type: software
 authors:
-  - family-names: "DaruFinance"
-    name-particle: ""
+  - family-names: "Vieira Gatto"
+    given-names: "Daniel"
+    alias: "DaruFinance"
+    email: "77agdg@gmail.com"
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
 url: "https://doi.org/10.5281/zenodo.19798594"
 doi: 10.5281/zenodo.19798594

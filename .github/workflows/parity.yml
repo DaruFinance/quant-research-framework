@@ -1,0 +1,76 @@
+# Parity CI: runs the property-test suite and the cross-language metric
+# diff against the matching commit of quant-research-framework-rs on
+# every PR and on push to main.
+#
+# The Python framework's parity discipline (§6 of the paper) is the
+# reason this workflow exists. A green check here means: (a) the
+# strategy contract's invariants still hold, and (b) the Rust port at
+# the same coordinated tag still produces identical metrics on the
+# three published surfaces.
+
+name: parity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          path: quant-research-framework
+
+      - name: Checkout the Rust port (coordinated tag/branch)
+        uses: actions/checkout@v4
+        with:
+          repository: DaruFinance/quant-research-framework-rs
+          ref: main
+          path: quant-research-framework-rs
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python deps
+        working-directory: quant-research-framework
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quant-research-framework-rs
+
+      - name: Build the Rust binary (release)
+        working-directory: quant-research-framework-rs
+        run: cargo build --release
+
+      - name: Run pytest (property tests + invariants)
+        working-directory: quant-research-framework
+        run: pytest -q
+
+      - name: Parity — default config (56 metric points, SOLUSDT 1h)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_check.py --csv data/SOLUSDT_1h.csv --tol 0.001
+
+      - name: Parity — regime + WFO (98 metric points, SOLUSDT 1h)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_regime.py --csv data/SOLUSDT_1h.csv --tol 0.001
+
+      - name: Parity — forex mode (56 metric points, EURUSD 1h)
+        working-directory: quant-research-framework-rs
+        run: python tools/parity_forex.py --csv data/EURUSD_1h.csv --tol 0.001

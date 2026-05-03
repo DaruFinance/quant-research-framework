@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-03  (paper-v2 retag)
+
+### Changed
+- **Package layout.** `backtester.py` is now `backtester/__init__.py`;
+  indicator helpers move to `backtester/indicators.py`. The legacy
+  top-level `indicators_tradingview.py` is retained as a thin
+  re-export shim so pre-v0.3.0 user scripts that do
+  `from indicators_tradingview import compute_atr, compute_rsi`
+  continue to work unchanged. Public API is otherwise byte-identical:
+  `import backtester as bt`, `bt.create_raw_signals = my_strategy`,
+  `bt.main()`, all module constants (`DEFAULT_LB`, `FOREX_MODE`, …)
+  unchanged.
+- **Cross-language parity verified post-refactor.** All four
+  invariants of the parity discipline still hold: `pytest tests/`
+  (24/24 pass); `parity_check.py` 56/56; `parity_regime.py` 98/98;
+  `parity_forex.py` 56/56. Sum: 210/210 metric points across 30 stages.
+
+### Added
+- **`CONTRIBUTING.md`** codifying the parity invariant (any change
+  altering engine semantics must keep the metric-output diff against
+  the Rust port within $10^{-3}$ relative tolerance) and the
+  four-command verification checklist contributors run before opening
+  a PR.
+- **`.github/workflows/parity.yml`** — GitHub Actions parity CI that
+  builds the Rust port at the matching commit, installs Python deps,
+  and runs the four-command checklist on every push and pull request.
+
+### Author
+- Sole author of record canonicalised to **Daniel Vieira Gatto**
+  in `CITATION.cff` (alias: `DaruFinance`); previous variants
+  (`DaruFinance`, `Daniel G.`) deprecated for citation-tracking
+  consistency. References in arXiv-submitted paper updated to match.
+
 ## [0.2.5] — 2026-04-30
 
 ### Fixed
