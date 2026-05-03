@@ -1,5 +1,6 @@
 pandas
 numpy
+scipy
 matplotlib
 numba
 pytz
