@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quant-research-framework"
-version = "0.2.5"
+version = "0.3.0"
 description = "Walk-forward backtester with statistical validation and robustness testing for systematic trading strategies."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "DaruFinance" }]
+authors = [{ name = "Daniel Vieira Gatto", email = "77agdg@gmail.com" }]
 keywords = ["backtesting", "walk-forward", "quant", "research", "trading"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -35,4 +35,5 @@ Homepage = "https://github.com/DaruFinance/quant-research-framework"
 "Rust port" = "https://github.com/DaruFinance/quant-research-framework-rs"
 
 [tool.setuptools]
-py-modules = ["backtester", "indicators_tradingview", "gen_synthetic", "binance_ohlc_downloader"]
+packages = ["backtester"]
+py-modules = ["indicators_tradingview", "gen_synthetic", "binance_ohlc_downloader"]
