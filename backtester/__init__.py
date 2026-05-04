@@ -2764,7 +2764,12 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
         news_on   = opts["news_on"]
         drift_on  = opts["drift_on"]
         var_on    = opts["var_on"]
-        rng       = opts.get("rng", random.Random())
+        # IND_VARIANCE_SEED: previously unseeded (paper-time review noted
+        # the +/- 1 LB perturbation propagated to a different optimised
+        # parameter across host architectures). Seeded to 42 here so the
+        # perturbation is deterministic. Mirrors IND_VARIANCE_SEED in
+        # quant-research-framework-rs/src/lib.rs.
+        rng       = opts.get("rng", random.Random(42))
 
         if fee_mult == 1 and slip_mult == 1 and not news_on and not drift_on and not var_on:
             continue
@@ -3187,7 +3192,11 @@ def apply_combined_robustness(
     globals()['SLIPPAGE_PCT'] = slip_old * slip_mult
 
     # 3) choose variant LBs -----------------------------------------------
-    rng = random.Random()
+    # IND_VARIANCE_SEED: seeded to 42 (was unseeded; cross-arch review
+    # flagged that the +/- 1 LB perturbation could pick a different
+    # optimum LB on different hosts and silently propagate into the
+    # printed metric ledger).
+    rng = random.Random(42)
 
     if signals_cache['mode'] == 'classic':
         base_lb   = signals_cache['best_lb']
