@@ -140,3 +140,157 @@ def report(trial_sharpes: np.ndarray, T: int, alpha: float = 0.05) -> str:
     n_f = int(bh_fdr(p, alpha).sum())
     return (f"  MTC  | N={len(p)}  T={T}  alpha={alpha:.2f}  "
             f"Bonferroni={n_b}  Holm={n_h}  BH-FDR={n_f}")
+
+
+# ============================================================================
+# Bootstrap-based multiple testing: White Reality Check and Romano-Wolf
+# ============================================================================
+
+def white_reality_check(
+    trial_returns: np.ndarray,
+    n_resamples: int = 1000,
+    mean_block: float = 10.0,
+    seed: int | None = 42,
+) -> dict:
+    """White (2000) "Reality Check" for data snooping.
+
+    Tests the global null ``H0: max_n SR_n <= 0`` against the alternative
+    that some strategy in the panel has positive expected SR. Uses the
+    stationary bootstrap of Politis & Romano (1994) on the per-bar
+    return matrix to construct the null distribution of the maximum
+    SR statistic.
+
+    Parameters
+    ----------
+    trial_returns : array-like of shape (T, N).
+        ``T`` per-bar returns for each of ``N`` candidate strategies.
+    n_resamples : int, default 1000.
+    mean_block : float, default 10.0.
+    seed : RNG seed.
+
+    Returns
+    -------
+    dict with:
+        'pvalue'  : float, the bootstrap p-value of the global null.
+        'V_obs'   : float, the observed max scaled-Sharpe statistic.
+        'V_dist'  : ndarray of shape (n_resamples,), the bootstrap
+                    distribution of V_obs under H0.
+    """
+    R = np.asarray(trial_returns, dtype=float)
+    if R.ndim != 2:
+        raise ValueError("trial_returns must be 2-D (T, N)")
+    T, N = R.shape
+    if T < 2 or N < 1:
+        raise ValueError(f"need T>=2, N>=1; got T={T}, N={N}")
+
+    # Observed scaled Sharpes per strategy
+    sr_obs = np.zeros(N)
+    for n in range(N):
+        sd = R[:, n].std(ddof=1)
+        if sd > 0:
+            sr_obs[n] = np.sqrt(T) * R[:, n].mean() / sd
+    V_obs = float(sr_obs.max())
+
+    # Centred returns for the null bootstrap (subtract column means so
+    # the resampled population has SR=0 under each panel column)
+    Rc = R - R.mean(axis=0, keepdims=True)
+
+    rng = np.random.default_rng(seed)
+    p = 1.0 / mean_block
+    V_dist = np.zeros(n_resamples)
+    for k in range(n_resamples):
+        # Stationary-bootstrap row indices: vector of length T
+        starts = rng.integers(0, T, size=T)
+        lens = rng.geometric(p, size=T)
+        idx = np.empty(T, dtype=np.intp)
+        i = 0
+        bi = 0
+        while i < T:
+            s = starts[bi]
+            L = lens[bi]
+            for j in range(L):
+                if i >= T: break
+                idx[i] = (s + j) % T
+                i += 1
+            bi = (bi + 1) % T
+        Rb = Rc[idx, :]
+        sr_b = np.zeros(N)
+        for n in range(N):
+            sd = Rb[:, n].std(ddof=1)
+            if sd > 0:
+                sr_b[n] = np.sqrt(T) * Rb[:, n].mean() / sd
+        V_dist[k] = sr_b.max()
+
+    pvalue = float((V_dist >= V_obs).mean())
+    return {"pvalue": pvalue, "V_obs": V_obs, "V_dist": V_dist}
+
+
+def romano_wolf(
+    trial_returns: np.ndarray,
+    n_resamples: int = 1000,
+    mean_block: float = 10.0,
+    alpha: float = 0.05,
+    seed: int | None = 42,
+) -> np.ndarray:
+    """Romano-Wolf (2005) step-down multiple-testing procedure.
+
+    Returns a per-strategy boolean rejection mask controlling FWER at
+    ``alpha``, based on the bootstrap distribution of the studentised
+    max statistic. More powerful than Bonferroni-Holm under positive
+    dependence (the typical case for trial Sharpes from an optimiser
+    grid sweep, since adjacent lookbacks are highly correlated).
+
+    Parameters
+    ----------
+    trial_returns : array-like of shape (T, N).
+    n_resamples, mean_block, seed : as in ``white_reality_check``.
+    alpha : float, FWER level.
+
+    Returns
+    -------
+    1-D ndarray of bools, length N, True for rejected strategies.
+
+    Notes
+    -----
+    This is the "studentised single-step max-T" version of Romano--Wolf;
+    the paper's full step-down extension iterates with reduction sets,
+    which is straightforward but adds 30-50 lines and is omitted here
+    for clarity. The single-step form is already strictly more powerful
+    than Bonferroni and Holm under PRDS.
+    """
+    R = np.asarray(trial_returns, dtype=float)
+    T, N = R.shape
+    if T < 2 or N < 1:
+        raise ValueError(f"need T>=2, N>=1; got T={T}, N={N}")
+
+    # Observed t-statistics (scaled Sharpe = sqrt(T) * mean / std)
+    sd = R.std(axis=0, ddof=1)
+    sd[sd == 0] = 1.0
+    t_obs = np.sqrt(T) * R.mean(axis=0) / sd
+
+    # Centre returns for the null bootstrap
+    Rc = R - R.mean(axis=0, keepdims=True)
+
+    rng = np.random.default_rng(seed)
+    p = 1.0 / mean_block
+    max_t_dist = np.zeros(n_resamples)
+    for k in range(n_resamples):
+        starts = rng.integers(0, T, size=T)
+        lens = rng.geometric(p, size=T)
+        idx = np.empty(T, dtype=np.intp)
+        i = 0; bi = 0
+        while i < T:
+            s = starts[bi]; L = lens[bi]
+            for j in range(L):
+                if i >= T: break
+                idx[i] = (s + j) % T
+                i += 1
+            bi = (bi + 1) % T
+        Rb = Rc[idx, :]
+        sd_b = Rb.std(axis=0, ddof=1)
+        sd_b[sd_b == 0] = 1.0
+        t_b = np.sqrt(T) * Rb.mean(axis=0) / sd_b
+        max_t_dist[k] = t_b.max()
+
+    crit = float(np.percentile(max_t_dist, 100 * (1 - alpha)))
+    return t_obs > crit
