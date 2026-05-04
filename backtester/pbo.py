@@ -55,7 +55,24 @@ def _sharpe(returns: np.ndarray) -> float:
     return float(r.mean() / sd) * math.sqrt(r.size)
 
 
-def cscv(equity_matrix: np.ndarray, S: int = 8) -> dict:
+def _warn_small_S(S: int, N: int, T: int) -> None:
+    """RuntimeWarning if (S, N, T) is small enough to mis-classify
+    one-shot ex-post-best overfitting (the documented "miss" mode of
+    CSCV at default S=8)."""
+    import warnings
+    if S < 16 and (N < 50 or T < 10000):
+        warnings.warn(
+            f"CSCV with S={S}, N={N}, T={T} may under-detect one-shot "
+            f"ex-post selection (the documented miss mode of small-S "
+            f"CSCV; see Bailey-Borwein-LdP-Zhu 2014 §3). Consider "
+            f"S=16 (the value used in the original paper) for a more "
+            f"reliable test on small panels.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+
+def cscv(equity_matrix: np.ndarray, S: int = 16) -> dict:
     """Run CSCV on an equity matrix and return the logit-rank distribution.
 
     Parameters
@@ -64,11 +81,15 @@ def cscv(equity_matrix: np.ndarray, S: int = 8) -> dict:
         ``T`` time-bars, ``N`` strategies. Each column is one strategy's
         equity curve (cumulative PnL); the per-bar return is the first
         difference.
-    S : int, default 8
+    S : int, default 16
         Number of equal-length time folds. Must be even; the in-sample is
         any ``S/2``-sized subset of folds and the out-of-sample is the
         complement. Larger ``S`` produces more splits (``binom(S, S/2)``)
-        but each fold is shorter.
+        but each fold is shorter. Default raised from 8 to 16 in commit
+        37f84ab+: 16 is the value used in the original Bailey-Borwein-
+        LdP-Zhu (2014) paper, reduces under-detection of one-shot
+        ex-post selection on small panels, and remains fast
+        (``binom(16, 8) = 12,870`` evaluations).
 
     Returns
     -------
@@ -87,6 +108,7 @@ def cscv(equity_matrix: np.ndarray, S: int = 8) -> dict:
         raise ValueError(f"S must be even, got {S}")
 
     T, N = M.shape
+    _warn_small_S(S, N, T)
     if N < 2:
         raise ValueError(f"need at least 2 strategies, got N={N}")
     if T < S:
@@ -144,12 +166,12 @@ def cscv(equity_matrix: np.ndarray, S: int = 8) -> dict:
     }
 
 
-def pbo(equity_matrix: np.ndarray, S: int = 8) -> float:
+def pbo(equity_matrix: np.ndarray, S: int = 16) -> float:
     """Convenience wrapper returning just the scalar PBO."""
     return cscv(equity_matrix, S=S)["pbo"]
 
 
-def report(equity_matrix: np.ndarray, S: int = 8) -> str:
+def report(equity_matrix: np.ndarray, S: int = 16) -> str:
     """One-line PBO summary suitable for appending to the engine's stdout."""
     out = cscv(equity_matrix, S=S)
     return (f"  PBO  | S={out['S']}  splits={out['n_splits']}  "
