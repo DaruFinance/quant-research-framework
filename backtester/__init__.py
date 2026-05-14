@@ -44,6 +44,12 @@ TRADE_SESSIONS = False                # if True, only trade during NY session
 SESSION_START   = "8:00"            # NY open time (HH:MM)
 SESSION_END     = "16:50"            # NY close time (HH:MM)
 NY_TZ           = pytz.timezone("America/New_York")
+
+# Item #46: maximum hold period in bars. 0 = no force-close (engine
+# behaves as pre-#46). When > 0, the kernel emits a code-2/4 close at
+# bar i for any open position with (i - ent_bar) >= MAX_HOLD_BARS.
+# Priority: news/session > hold-period > SL/TP intrabar > signal-driven.
+MAX_HOLD_BARS  = 0
 DEFAULT_LB          = 50                         # for RAW baseline
 LOOKBACK_RANGE      = (int(DEFAULT_LB*0.25), int(DEFAULT_LB*1.5)+1)
 
@@ -1311,6 +1317,8 @@ def _backtest_numba_core(o, h, l, c, sig,
                          sl_perc, tp_perc, pip_size,
                          fee_rate, slip, funding_rate,
                          position_size, account_size,
+                         # item #46: hold-period bin -----------------------------------
+                         max_hold_bars,
                          # carryin -----------------------------------------------------
                          carry_side, carry_ent_idx, carry_entry_price):
     """
@@ -1394,6 +1402,12 @@ def _backtest_numba_core(o, h, l, c, sig,
         end_bar_flag = session_end[idx] if use_sessions else False
         if open_pos != 0:
             if (use_news and news_close[idx]) or (use_sessions and end_bar_flag):
+                code = 2 if open_pos == 1 else 4
+            # Item #46: hold-period force-close. Pure index arithmetic
+            # (idx and ent_bar are both at or before this bar), so
+            # lookahead-free by construction. Only fires if news/session
+            # didn't already set code via the elif chain semantics.
+            elif max_hold_bars > 0 and (idx - ent_bar) >= max_hold_bars:
                 code = 2 if open_pos == 1 else 4
         if use_sessions and (code in (1, 3)) and end_bar_flag:
             code = 0                                    # block new entry
@@ -1765,6 +1779,7 @@ def backtest(df, raw_sig, carry_in=None):
         0.0 if FOREX_MODE else FUNDING_FEE/100,
         1.0 if FOREX_MODE else RISK_AMOUNT,
         ACCOUNT_SIZE,
+        MAX_HOLD_BARS,                                  # item #46
         carry_side_num, carry_ent, carry_price
     )
 

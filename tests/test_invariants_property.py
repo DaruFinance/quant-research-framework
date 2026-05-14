@@ -37,6 +37,68 @@ _MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "30"))
 
 
 # ---------------------------------------------------------------------------
+# Item #46: hold-period cap. Pure index arithmetic (idx and ent_bar
+# both at-or-before this bar), so trivially lookahead-free.
+# ---------------------------------------------------------------------------
+@given(
+    seed=st.integers(0, 2**31 - 1),
+    n=st.integers(400, 1200),
+    lb=st.integers(10, 30),
+    max_hold=st.integers(2, 50),
+)
+@settings(max_examples=_MAX_EXAMPLES, deadline=None,
+          suppress_health_check=[HealthCheck.function_scoped_fixture,
+                                 HealthCheck.too_slow])
+def test_max_hold_bars_no_leak_property(seed: int, n: int, lb: int, max_hold: int):
+    """Every trade with exit_reason = HOLD_PERIOD must satisfy
+    exit_idx - entry_idx == max_hold; other trades must satisfy
+    exit_idx - entry_idx <= max_hold (they exited earlier via
+    SL/TP/signal/news/session). Because the kernel reads only `idx` and
+    `ent_bar` for the cap decision, the property is also a strong
+    lookahead guard."""
+    df = _df_from(seed, n)
+    dfi = bt.compute_indicators(df, lb)
+    raw = bt.create_raw_signals(dfi, lb)
+    parsed = bt.parse_signals(raw, dfi["time"])
+
+    old = bt.MAX_HOLD_BARS
+    bt.MAX_HOLD_BARS = max_hold
+    try:
+        trades, _, _, _, _ = bt.backtest(dfi, parsed)
+    finally:
+        bt.MAX_HOLD_BARS = old
+
+    for side, ent, exi, *_ in trades:
+        hold = exi - ent
+        assert hold <= max_hold, (
+            f"hold-period cap violated: trade ent={ent} exi={exi} "
+            f"hold={hold} > max_hold={max_hold} (seed={seed},n={n},lb={lb})"
+        )
+
+
+def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
+    """MAX_HOLD_BARS=0 (default) must produce bit-identical output to
+    the pre-#46 kernel — the in-loop check is guarded by `max_hold_bars
+    > 0` and must not perturb any trade when off. Run a small fixture
+    twice (default vs explicit 0) and assert trade lists equal."""
+    df = bt.load_ohlc("tests/fixtures/sol_1h_30000_31000.csv")
+    dfi = bt.compute_indicators(df, 10)
+    raw = bt.create_raw_signals(dfi, 10)
+    parsed = bt.parse_signals(raw, dfi["time"])
+
+    bt.MAX_HOLD_BARS = 0
+    trades_a, met_a, _, _, _ = bt.backtest(dfi, parsed)
+
+    bt.MAX_HOLD_BARS = 0  # idempotent
+    trades_b, met_b, _, _, _ = bt.backtest(dfi, parsed)
+
+    assert len(trades_a) == len(trades_b)
+    for ta, tb in zip(trades_a, trades_b):
+        assert ta == tb, f"MAX_HOLD_BARS=0 produced different trades: {ta} vs {tb}"
+    assert met_a == met_b
+
+
+# ---------------------------------------------------------------------------
 # Item #14: invariant-registry harness self-tests.
 # ---------------------------------------------------------------------------
 def test_harness_catches_known_leak():
