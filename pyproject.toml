@@ -38,7 +38,7 @@ examples = ["scikit-learn"]
 # time x asset x field N-D dataset; pyarrow for the bundled
 # DS-PANEL-3 Parquet fixtures. Pulled only when the user opts into
 # the panel plugin via `pip install quant-research-framework[panel]`.
-panel = ["xarray>=2024.0", "pyarrow>=14.0"]
+panel = ["xarray>=2024.0", "pyarrow>=14.0", "scipy>=1.10"]
 
 [project.urls]
 Homepage = "https://github.com/DaruFinance/quant-research-framework"
