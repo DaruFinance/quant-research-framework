@@ -192,7 +192,7 @@ def test_trade_indices_and_prices_are_well_formed():
     trades, _, _, _, _ = bt.backtest(dfi, parsed)
     n = len(df)
 
-    for side, ent, exi, ep, xp, qty, pnl in trades:
+    for side, ent, exi, ep, xp, qty, pnl, *_ in trades:
         assert side in (1, -1), f"bad side {side}"
         assert 0 <= ent < n,    f"entry idx {ent} out of range"
         assert 0 <= exi < n,    f"exit idx {exi} out of range"

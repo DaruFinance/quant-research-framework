@@ -134,7 +134,7 @@ def test_trade_indices_well_formed_property(seed: int, n: int, lb: int):
     parsed = bt.parse_signals(raw, dfi["time"])
     trades, _, _, _, _ = bt.backtest(dfi, parsed)
 
-    for side, ent, exi, ep, xp, qty, pnl in trades:
+    for side, ent, exi, ep, xp, qty, pnl, *_ in trades:
         assert side in (1, -1), f"bad side {side} (seed={seed},n={n},lb={lb})"
         assert 0 <= ent < n,    f"entry idx {ent} oob"
         assert 0 <= exi < n,    f"exit idx {exi} oob"
@@ -142,6 +142,57 @@ def test_trade_indices_well_formed_property(seed: int, n: int, lb: int):
         assert ep > 0 and xp > 0, f"non-positive prices ({ep}, {xp})"
         assert qty >= 0,        f"negative quantity {qty}"
         assert np.isfinite(pnl), f"non-finite PnL {pnl}"
+
+
+# ---------------------------------------------------------------------------
+# Property 3b: aggregate_legs (item #2) is pure data-only. Polluting the
+# tail of the input leg list at positions >= T cannot change the first T
+# Trade groups in the output. Pure lookahead-freeness check on the
+# aggregation layer that sits between the kernel's per-leg 9-tuples and
+# downstream multi-leg analytics.
+# ---------------------------------------------------------------------------
+@given(
+    seed=st.integers(0, 2**31 - 1),
+    n=st.integers(10, 200),
+    cut_frac=st.floats(0.2, 0.9),
+)
+@settings(max_examples=_MAX_EXAMPLES * 4, deadline=None)
+def test_aggregate_legs_no_leak_property(seed: int, n: int, cut_frac: float):
+    from backtester.ledger import aggregate_legs
+    rng = np.random.default_rng(seed)
+    # Clean input: kernel-shape 9-tuples with monotonic tgid = row index,
+    # leg_id = 0 (single-leg single-asset mode).
+    legs = [
+        (1, i * 3, i * 3 + 2, 100.0, 101.0, 0.1, 1.0, 0, i)
+        for i in range(n)
+    ]
+    cut = max(1, int(n * cut_frac))
+    # Polluted input: replace tail with garbage entry_idx / exi / prices /
+    # qty / pnl, keeping tgid monotonic. The pollution simulates a future
+    # bug that emits nonsense leg metadata in positions > T; the property
+    # asserts the first T groups in the output are unaffected.
+    polluted = list(legs[:cut])
+    for i in range(cut, n):
+        polluted.append(
+            (
+                int(rng.choice([1, -1])),
+                int(rng.integers(-10_000, 10_000)),
+                int(rng.integers(-10_000, 10_000)),
+                float(rng.normal(0, 1_000)),
+                float(rng.normal(0, 1_000)),
+                float(rng.normal(0, 100)),
+                float(rng.normal(0, 10_000)),
+                int(rng.integers(0, 1_000)),
+                i,  # keep tgid monotonic so we don't conflate with earlier groups
+            )
+        )
+
+    out_clean = aggregate_legs(legs)
+    out_poll = aggregate_legs(polluted)
+    assert out_clean[:cut] == out_poll[:cut], (
+        f"aggregate_legs leaked tail pollution into output[:{cut}] "
+        f"(seed={seed}, n={n})"
+    )
 
 
 # ---------------------------------------------------------------------------

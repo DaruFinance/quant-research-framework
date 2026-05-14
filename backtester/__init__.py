@@ -573,10 +573,13 @@ def _safe_append_or_write_trade_csv(df_export: pd.DataFrame, path: str, write_he
 
 def _metrics_from_trades(trades):
     # 1) per-trade returns in R-units vs USD
+    # Item #2: trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
+    # leg_id, tgid). pnl is at index 6; do not use *_, pnl which would
+    # capture tgid as pnl. Indexing by [6] is robust to future widening.
     if FOREX_MODE:
-        rets = np.array([pnl / POSITION_SIZE for *_, pnl in trades], dtype=float)
+        rets = np.array([t[6] / POSITION_SIZE for t in trades], dtype=float)
     else:
-        rets = np.array([pnl / ACCOUNT_SIZE for *_, pnl in trades], dtype=float)
+        rets = np.array([t[6] / ACCOUNT_SIZE for t in trades], dtype=float)
     tc   = len(rets)
     wr   = np.mean(rets > 0) if tc else 0.0
     roi  = rets.sum() if tc else 0.0   # sum of R or sum of fracreturns
@@ -1272,6 +1275,12 @@ def _backtest_numba_core(o, h, l, c, sig,
     trades_xp    = List.empty_list(types.float64)     #  exit price
     trades_qty   = List.empty_list(types.float64)     #  quantity
     trades_pnl   = List.empty_list(types.float64)     #  pnl
+    # Item #2: per-leg metadata. Single-leg single-asset mode emits
+    # leg_id=0 and trade_group_id=row_index, so downstream aggregation
+    # via backtester.ledger.aggregate_legs is uniform across single- and
+    # multi-leg trades. Metric output stays bit-identical to v0.4.0.
+    trades_leg_id = List.empty_list(types.int32)
+    trades_tgid   = List.empty_list(types.int64)
 
     equity_list  = List()
     funding_acc  = 0.0
@@ -1372,6 +1381,8 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
 
                 if use_forex:
                     # equity as fraction of risk
@@ -1409,6 +1420,8 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0            # flat
@@ -1444,6 +1457,8 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0
@@ -1477,6 +1492,8 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_xp.append(exit_price)
             trades_qty.append(qty)
             trades_pnl.append(pnl)
+            trades_leg_id.append(0)
+            trades_tgid.append(len(trades_tgid))
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1503,6 +1520,8 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_xp.append(exit_price)
             trades_qty.append(qty)
             trades_pnl.append(pnl)
+            trades_leg_id.append(0)
+            trades_tgid.append(len(trades_tgid))
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1530,6 +1549,8 @@ def _backtest_numba_core(o, h, l, c, sig,
         trades_xp.append(exit_price)
         trades_qty.append(qty)
         trades_pnl.append(pnl)
+        trades_leg_id.append(0)
+        trades_tgid.append(len(trades_tgid))
         if not use_forex:
             equity_list.append(equity_list[-1] + pnl)
 
@@ -1541,6 +1562,8 @@ def _backtest_numba_core(o, h, l, c, sig,
     xp     = np.asarray(trades_xp,    dtype=np.float64)
     qtys   = np.asarray(trades_qty,   dtype=np.float64)
     pnl    = np.asarray(trades_pnl,   dtype=np.float64)
+    legid  = np.asarray(trades_leg_id, dtype=np.int32)
+    tgid   = np.asarray(trades_tgid,   dtype=np.int64)
 
     # equity curve & returns --------------------------------------------------
     if use_forex:
@@ -1569,8 +1592,10 @@ def _backtest_numba_core(o, h, l, c, sig,
     metrics_tuple = (tc, roi, pf, wr, expc, shp, dd, consistency)
 
 
-    # pack trades as list of tuples for identical API
-    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl))
+    # Pack trades as list of 9-tuples: 7 legacy fields plus leg_id and
+    # trade_group_id (item #2). Single-leg single-asset emits leg_id=0
+    # and trade_group_id=row_index; consumers ignore the tail via *_.
+    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl, legid, tgid))
 
     return trades, metrics_tuple, eq_frac, rets, None
 
@@ -1964,7 +1989,10 @@ def export_trades(trades, df, strat, window, sample, path, write_header):
     t, o, h, l, c = (df[x].values for x in ('time','open','high','low','close'))
     rows = []
     for trade in trades:
-        side, ei, xi, _entry_price, _exit_price, _qty, pnl = trade
+        # Item #2: trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
+        # *_ swallows the trailing leg metadata; the CSV schema stays at
+        # 15 columns so parity_ledger.py keeps working unchanged.
+        side, ei, xi, _entry_price, _exit_price, _qty, pnl, *_ = trade
         rows.append([
             strat,
             window,
@@ -2627,7 +2655,9 @@ def _classic_single_run_impl(df):
             trades_all = tr_is_opt + tr_oos_opt
 
             # 3.b) extract pnl from each trade tuple
-            pnl_list = [trade[-1] for trade in trades_all]  # last element is pnl
+            # Item #2: pnl is at index 6; the 9-tuple's last element is
+            # tgid (row index), so trade[-1] would break the cumsum.
+            pnl_list = [trade[6] for trade in trades_all]
 
             # 3.c) cumulative-sum into an equity curve
             if FOREX_MODE:
