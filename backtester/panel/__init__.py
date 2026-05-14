@@ -20,5 +20,18 @@ except ImportError as e:
     ) from e
 
 from .loader import load_panel, PanelGapError, PanelSchemaError, PanelData  # noqa: E402,F401
+from .regime import (  # noqa: E402,F401
+    detect_regimes_panel,
+    detect_regimes_panel_per_asset,
+    detect_regimes_panel_market,
+)
 
-__all__ = ["load_panel", "PanelGapError", "PanelSchemaError", "PanelData"]
+__all__ = [
+    "load_panel",
+    "PanelGapError",
+    "PanelSchemaError",
+    "PanelData",
+    "detect_regimes_panel",
+    "detect_regimes_panel_per_asset",
+    "detect_regimes_panel_market",
+]

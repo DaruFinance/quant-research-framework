@@ -183,6 +183,130 @@ def test_empty_paths_dict_raises():
     assert "empty" in str(exc.value).lower()
 
 
+# ---------------------------------------------------------------------------
+# Item #4: cross-asset regime detector lookahead leak harness (HIGH-RISK).
+# For every (victim, witness) pair and every T in a 50-point grid, polluting
+# `victim`'s data at rows > T must leave `witness`'s regime labels at
+# rows <= T bit-identical. Both default detectors are leak-free by
+# construction; this test is the safety net for future variants.
+# ---------------------------------------------------------------------------
+def _pollute_asset_after(panel, asset: str, cut_idx: int):
+    """Return a deep copy of `panel` with `asset`'s OHLC values
+    replaced by NaN at rows >= cut_idx."""
+    ds = panel.ds.copy(deep=True)
+    ai = panel.assets.index(asset)
+    for field in panel.fields:
+        arr = ds[field].values
+        arr[cut_idx:, ai] = np.nan
+        ds[field].values[...] = arr
+    return type(panel)(ds=ds)
+
+
+def _assert_no_cross_asset_leak(panel, detector_fn, *, n_cut_points: int = 50):
+    """50-point pollute battery across all (victim, witness) asset pairs."""
+    clean = detector_fn(panel)
+    n = len(panel)
+    rng = np.random.default_rng(seed=0xCA1F)
+    # Sample cut indices across the panel; skip the warmup window where
+    # EMA-200 hasn't stabilised and labels are all "Ranging" anyway.
+    cuts = sorted(set(int(rng.integers(220, n - 1)) for _ in range(n_cut_points)))
+    for cut_idx in cuts:
+        for victim in panel.assets:
+            polluted = _pollute_asset_after(panel, victim, cut_idx)
+            poll_labels = detector_fn(polluted)
+            for witness in panel.assets:
+                if witness == victim:
+                    continue
+                clean_head = clean[witness].iloc[:cut_idx].astype(str).reset_index(drop=True)
+                poll_head = poll_labels[witness].iloc[:cut_idx].astype(str).reset_index(drop=True)
+                assert (clean_head == poll_head).all(), (
+                    f"cross-asset leak: polluting {victim!r} at idx >= {cut_idx} "
+                    f"changed {witness!r}'s labels in [0, {cut_idx})"
+                )
+
+
+def test_panel_regime_per_asset_no_cross_asset_leak():
+    """Default per-asset detector must not couple any pair of assets.
+    The HIGH-RISK 50-T pollute battery from the plan."""
+    from backtester.panel import (
+        detect_regimes_panel_per_asset, load_panel,
+    )
+    panel = load_panel(PANEL_PATHS)
+    _assert_no_cross_asset_leak(panel, detect_regimes_panel_per_asset)
+
+
+def test_panel_regime_market_no_cross_asset_leak():
+    """Market-regime detector (BTC labels broadcast to all) is leak-free
+    too: polluting SOL or ETH cannot change BTC's own labels at <= T
+    (BTC reads only its own past); polluting BTC at > T cannot change
+    BTC's labels at <= T."""
+    from backtester.panel import (
+        detect_regimes_panel_market, load_panel,
+    )
+    panel = load_panel(PANEL_PATHS)
+    detector = detect_regimes_panel_market("BTC")
+    _assert_no_cross_asset_leak(panel, detector)
+
+
+def test_panel_regime_market_broadcasts_market_asset_labels():
+    """All assets inherit the market asset's regime, bit-identical."""
+    from backtester.panel import (
+        detect_regimes_panel_market, load_panel,
+    )
+    panel = load_panel(PANEL_PATHS)
+    labels = detect_regimes_panel_market("BTC")(panel)
+    btc = labels["BTC"]
+    for asset in panel.assets:
+        if asset == "BTC":
+            continue
+        assert (labels[asset].values == btc.values).all(), (
+            f"market detector did not broadcast BTC labels to {asset}"
+        )
+
+
+def test_cross_asset_leak_harness_catches_known_leak():
+    """The 50-T pollute battery must catch a deliberately-leaking
+    panel detector. We register a detector that copies the NEXT bar's
+    SOL close into BTC's regime — a clear cross-asset future-read —
+    and assert ``_assert_no_cross_asset_leak`` raises with the
+    offending (victim, witness) pair in the message."""
+    from backtester.panel import load_panel
+    panel = load_panel(PANEL_PATHS)
+
+    def leaky_detector(panel):
+        # BTC's "label" at t reads SOL.close at t+1 — a future leak
+        # across assets. Polluting SOL at >T must change BTC at <=T.
+        sol_idx = panel.assets.index("SOL")
+        sol = panel.ds["close"].values[:, sol_idx]
+        sol_next = np.roll(sol, -1)
+        sol_next[-1] = sol[-1]
+        out = {}
+        for a in panel.assets:
+            labels = np.where(sol_next > sol, "UP", "DOWN")
+            out[a] = pd.Series(labels)
+        return out
+
+    raised = False
+    try:
+        _assert_no_cross_asset_leak(panel, leaky_detector, n_cut_points=5)
+    except AssertionError as e:
+        raised = True
+        msg = str(e)
+        assert "cross-asset leak" in msg
+        assert "SOL" in msg, "victim asset must appear in the error message"
+    assert raised, "deliberate cross-asset leak was NOT caught by the harness"
+
+
+def test_panel_regime_market_rejects_missing_market_asset():
+    """If the named market asset isn't in the panel, fail loud."""
+    from backtester.panel import (
+        detect_regimes_panel_market, load_panel,
+    )
+    panel = load_panel(PANEL_PATHS)
+    with pytest.raises(ValueError, match="DOGE"):
+        detect_regimes_panel_market("DOGE")(panel)
+
+
 def test_loader_no_lookahead_under_tail_pollution(tmp_path):
     """The loader is pure inner-join + alignment. Polluting the tail of
     one CSV with garbage rows (still in monotonically-increasing time)
