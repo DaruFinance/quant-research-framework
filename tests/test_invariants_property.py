@@ -36,6 +36,76 @@ import backtester as bt
 _MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "30"))
 
 
+# ---------------------------------------------------------------------------
+# Item #14: invariant-registry harness self-tests.
+# ---------------------------------------------------------------------------
+def test_harness_catches_known_leak():
+    """A deliberately leaky function must trip assert_no_lookahead.
+
+    Constructs a fake regime detector that returns ``close.shift(-1)`` —
+    i.e. uses tomorrow's price to label today. The harness should detect
+    that polluting future rows changes the output for earlier rows and
+    raise AssertionError naming the offending invariant.
+    """
+    from backtester.invariants import InvariantSpec, assert_no_lookahead
+
+    def leaky_detector(df):
+        # Shifts the NEXT bar's close back into today's label — clear leak.
+        return df["close"].shift(-1).fillna(0.0)
+
+    spec = InvariantSpec(name="leaky_sentinel", func=leaky_detector,
+                         data_kind="ohlc_df")
+    df = _df_from(seed=42, n=400)
+    raised = False
+    try:
+        assert_no_lookahead(spec, df, cut=200)
+    except AssertionError as e:
+        raised = True
+        assert "leaky_sentinel" in str(e), (
+            f"harness error message must name the leaky invariant: {e!r}"
+        )
+    assert raised, "deliberate leak was NOT caught by the harness"
+
+
+def test_harness_passes_lookahead_free_function():
+    """The harness must NOT false-positive on a known-good function.
+
+    Registers a trivial 20-bar moving-average detector that reads only
+    past close values, runs the pollute-and-verify probe; must complete
+    silently without raising.
+    """
+    from backtester.invariants import InvariantSpec, assert_no_lookahead
+
+    def clean_detector(df):
+        # 20-bar SMA threshold — uses only df.close up to and including
+        # the labelled bar.
+        sma = df["close"].rolling(20, min_periods=1).mean()
+        return (df["close"] > sma).astype(int)
+
+    spec = InvariantSpec(name="clean_sma_threshold", func=clean_detector,
+                         data_kind="ohlc_df")
+    df = _df_from(seed=43, n=400)
+    assert_no_lookahead(spec, df, cut=200)
+
+
+def test_registered_invariants_pass_default_pollute():
+    """Every function registered via @registers_invariant must survive
+    the default-polluter probe. New items (#4 cross-asset regime,
+    #9 spread screener, #11 cadence engine, ...) inherit this gate
+    automatically just by carrying the decorator.
+    """
+    from backtester.invariants import list_invariants, assert_no_lookahead
+
+    specs = list_invariants()
+    assert specs, "registry is empty — default_regime_detector should register on import"
+    df = _df_from(seed=44, n=500)
+    df["EMA_200"] = df["close"].ewm(span=200, adjust=False).mean()
+    for spec in specs:
+        if spec.data_kind != "ohlc_df":
+            continue
+        assert_no_lookahead(spec, df, cut=300)
+
+
 def _df_from(seed: int, n: int, start_unix: int = 1_600_000_000,
              interval_s: int = 3600) -> pd.DataFrame:
     rng = np.random.default_rng(seed)

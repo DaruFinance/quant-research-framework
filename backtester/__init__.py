@@ -1011,6 +1011,10 @@ def get_regimes(df, length=8):
     return regimes
 
 
+from backtester.invariants import registers_invariant
+
+
+@registers_invariant(name="default_regime_detector", data_kind="ohlc_df")
 def detect_regimes(df: pd.DataFrame) -> pd.Series:
     """
     Pluggable regime detector. Returns a pd.Series of labels (strings drawn
@@ -1021,6 +1025,13 @@ def detect_regimes(df: pd.DataFrame) -> pd.Series:
       * Return labels that are a subset of `REGIME_LABELS` (length 2..5)
       * Be free of look-ahead — only use information available at bar i-1 or
         earlier when labelling bar i.
+
+    The ``@registers_invariant`` decorator (item #14) auto-registers this
+    function with the lookahead-leak harness so its claim of lookahead
+    freeness is property-tested every CI run. Custom detectors plugged in
+    via ``bt.detect_regimes = my_detector`` should also be decorated to
+    inherit the same gate.
+
     Override pattern (in your strategy file):
         import backtester as bt
         bt.REGIME_LABELS  = ['Calm', 'Volatile']
