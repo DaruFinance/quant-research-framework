@@ -23,7 +23,15 @@ from typing import Iterable, List, Sequence
 
 @dataclass(frozen=True)
 class Leg:
-    """A single leg of a logical trade. Mirrors the kernel's 9-tuple."""
+    """A single leg of a logical trade. Mirrors the kernel's 14-tuple.
+
+    The kernel emits (side, ent, exi, ep, xp, qty, pnl, leg_id, tgid,
+    fee, slippage, funding, gross_pnl, net_pnl). Items #1-7 are the
+    legacy fields; #8-9 carry the multi-leg group (item #2); #10-14
+    are the cost decomposition (item #3) satisfying
+        gross_pnl - fee - slippage - funding == net_pnl
+    to floating-point tolerance. pnl == net_pnl by construction.
+    """
     side: int
     entry_idx: int
     exit_idx: int
@@ -33,6 +41,13 @@ class Leg:
     pnl: float
     leg_id: int = 0
     trade_group_id: int = 0
+    # Item #3 cost decomposition. Defaulting to 0.0 keeps the Leg
+    # constructable from legacy 7- or 9-tuples without ValueErrors.
+    fee: float = 0.0
+    slippage: float = 0.0
+    funding: float = 0.0
+    gross_pnl: float = 0.0
+    net_pnl: float = 0.0
 
 
 @dataclass
@@ -74,11 +89,16 @@ def aggregate_legs(legs: Iterable) -> List[Trade]:
         if len(t) == 7:
             side, ent, exi, ep, xp, qty, pnl = t
             leg_id, tgid = 0, row_idx
+            fee, slippage, funding, gross_pnl, net_pnl = 0.0, 0.0, 0.0, pnl, pnl
         elif len(t) == 9:
             side, ent, exi, ep, xp, qty, pnl, leg_id, tgid = t
+            fee, slippage, funding, gross_pnl, net_pnl = 0.0, 0.0, 0.0, pnl, pnl
+        elif len(t) == 14:
+            (side, ent, exi, ep, xp, qty, pnl, leg_id, tgid,
+             fee, slippage, funding, gross_pnl, net_pnl) = t
         else:
             raise ValueError(
-                f"aggregate_legs: tuple width {len(t)} not in (7, 9)"
+                f"aggregate_legs: tuple width {len(t)} not in (7, 9, 14)"
             )
         groups[int(tgid)].append(
             Leg(
@@ -91,6 +111,11 @@ def aggregate_legs(legs: Iterable) -> List[Trade]:
                 pnl=float(pnl),
                 leg_id=int(leg_id),
                 trade_group_id=int(tgid),
+                fee=float(fee),
+                slippage=float(slippage),
+                funding=float(funding),
+                gross_pnl=float(gross_pnl),
+                net_pnl=float(net_pnl),
             )
         )
     trades = []

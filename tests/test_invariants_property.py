@@ -196,6 +196,68 @@ def test_aggregate_legs_no_leak_property(seed: int, n: int, cut_frac: float):
 
 
 # ---------------------------------------------------------------------------
+# Property 3c: item #3 cost decomposition identity. For every trade leg the
+# kernel emits, gross_pnl - fee - slippage - funding == net_pnl to floating-
+# point tolerance, AND polluting the cost columns at positions > T cannot
+# corrupt the cost values stored in Leg objects from positions <= T.
+# ---------------------------------------------------------------------------
+@given(
+    seed=st.integers(0, 2**31 - 1),
+    n=st.integers(400, 1200),
+    lb=st.integers(10, 30),
+)
+@settings(max_examples=_MAX_EXAMPLES, deadline=None,
+          suppress_health_check=[HealthCheck.function_scoped_fixture,
+                                 HealthCheck.too_slow])
+def test_per_leg_costs_decomposition_property(seed: int, n: int, lb: int):
+    from backtester.ledger import aggregate_legs
+    df = _df_from(seed, n)
+    dfi = bt.compute_indicators(df, lb)
+    raw = bt.create_raw_signals(dfi, lb)
+    parsed = bt.parse_signals(raw, dfi["time"])
+    trades, _, _, _, _ = bt.backtest(dfi, parsed)
+    # Identity: gross_pnl - fee - slippage - funding == net_pnl per leg.
+    for t in trades:
+        if len(t) < 14:
+            continue  # kernel still on pre-#3 tuple width (unreachable here)
+        pnl, fee, slip, fund, gross, net = t[6], t[9], t[10], t[11], t[12], t[13]
+        dev = abs(gross - fee - slip - fund - net)
+        assert dev < 1e-9, (
+            f"cost decomposition violated by {dev} on a leg "
+            f"(seed={seed}, n={n}, lb={lb}): gross={gross} fee={fee} "
+            f"slip={slip} fund={fund} net={net} pnl={pnl}"
+        )
+        # net_pnl == pnl by construction (kernel-time identity).
+        assert abs(pnl - net) < 1e-12
+
+    # Pollute the cost columns at tail positions; assert aggregate_legs
+    # returns the same Leg objects (cost values intact) for positions <= cut.
+    if len(trades) < 4:
+        return
+    cut = max(1, len(trades) // 2)
+    rng = np.random.default_rng(seed)
+    polluted = []
+    for i, t in enumerate(trades):
+        if i < cut:
+            polluted.append(t)
+        else:
+            # Replace cost fields with garbage, keep tgid monotonic so
+            # group ordering is preserved.
+            t_list = list(t)
+            t_list[9]  = float(rng.normal(0, 1000))   # fee
+            t_list[10] = float(rng.normal(0, 1000))   # slip
+            t_list[11] = float(rng.normal(0, 100))    # funding
+            t_list[12] = float(rng.normal(0, 10000))  # gross
+            t_list[13] = float(rng.normal(0, 10000))  # net
+            polluted.append(tuple(t_list))
+    clean_groups = aggregate_legs(trades)
+    poll_groups = aggregate_legs(polluted)
+    assert clean_groups[:cut] == poll_groups[:cut], (
+        f"polluted cost fields at >={cut} affected aggregate_legs output[:{cut}]"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Property 4: with TRADE_SESSIONS on, no trade entry timestamp falls outside
 # the configured session window. Generates session windows from a small
 # discrete set so monkeypatch is well-defined.

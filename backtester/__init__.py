@@ -1252,6 +1252,44 @@ def _five_segment_sums(vec):
 
 
 @njit(cache=True)
+def _decompose_costs(side_val, entry_price, exit_price, qty,
+                     fee_entry, fee_exit, funding_acc, slip,
+                     use_forex, pnl):
+    """Item #3 cost decomposition for a single trade leg.
+
+    Returns (fee, slippage, funding, gross_pnl) such that:
+        gross_pnl - fee - slippage - funding == pnl   (to fp tolerance)
+
+    Crypto (use_forex=False):
+        fee       = fee_entry + fee_exit
+        slippage  = qty * slip * (raw_entry + raw_exit)
+                    with raw_* recovered via the inverse slippage adjust:
+                      raw_entry = entry_price / (1 + slip)  for long entry
+                      raw_exit  = exit_price  / (1 - slip)  for long exit
+                      (mirror for short)
+        funding   = funding_acc (caller resets to 0 after this returns)
+        gross_pnl = pnl + fee + slippage + funding (identity check)
+
+    Forex (use_forex=True):
+        R-unit pnl already folds slippage and funding into trade_res;
+        we surface slippage = funding = 0 and gross_pnl = pnl + fee.
+    """
+    fee_total = fee_entry + fee_exit
+    if use_forex:
+        return fee_total, 0.0, 0.0, pnl + fee_total
+    if side_val == 1:
+        raw_entry = entry_price / (1.0 + slip)
+        raw_exit  = exit_price  / (1.0 - slip)
+    else:
+        raw_entry = entry_price / (1.0 - slip)
+        raw_exit  = exit_price  / (1.0 + slip)
+    slippage  = qty * slip * (raw_entry + raw_exit)
+    funding   = funding_acc
+    gross_pnl = pnl + fee_total + slippage + funding
+    return fee_total, slippage, funding, gross_pnl
+
+
+@njit(cache=True)
 def _backtest_numba_core(o, h, l, c, sig,
                          session_idxs, session_end, news_close, funding_mask,
                          # config flags -------------------------------------------------
@@ -1281,6 +1319,20 @@ def _backtest_numba_core(o, h, l, c, sig,
     # multi-leg trades. Metric output stays bit-identical to v0.4.0.
     trades_leg_id = List.empty_list(types.int32)
     trades_tgid   = List.empty_list(types.int64)
+    # Item #3: cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
+    # slippage = qty*slip*(raw_entry+raw_exit) recovered from slipped
+    # prices via entry_price/(1+slip) for long entries (and the obvious
+    # mirror for shorts); funding = funding_acc accrued during the
+    # position's life. Decomposition identity:
+    #     gross_pnl - fee - slippage - funding == net_pnl  (to 1e-9)
+    # net_pnl is stored explicitly alongside the existing pnl field for
+    # API symmetry; they are numerically equal by construction. Forex
+    # mode emits slippage=funding=0 (R-unit math folds those terms in).
+    trades_fee     = List.empty_list(types.float64)
+    trades_slip    = List.empty_list(types.float64)
+    trades_funding = List.empty_list(types.float64)
+    trades_gross   = List.empty_list(types.float64)
+    trades_net     = List.empty_list(types.float64)
 
     equity_list  = List()
     funding_acc  = 0.0
@@ -1371,6 +1423,13 @@ def _backtest_numba_core(o, h, l, c, sig,
                 else:
                     pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                           - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition BEFORE funding_acc reset so
+                # the helper sees the funding actually paid on this leg.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    open_pos, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 # save trade
@@ -1383,6 +1442,11 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_pnl.append(pnl)
                 trades_leg_id.append(0)
                 trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
 
                 if use_forex:
                     # equity as fraction of risk
@@ -1410,6 +1474,12 @@ def _backtest_numba_core(o, h, l, c, sig,
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
                 else:
                     pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    -1, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 # store
@@ -1422,6 +1492,11 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_pnl.append(pnl)
                 trades_leg_id.append(0)
                 trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0            # flat
@@ -1448,6 +1523,12 @@ def _backtest_numba_core(o, h, l, c, sig,
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
                 else:
                     pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    1, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 trades_side.append(1)
@@ -1459,6 +1540,11 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_pnl.append(pnl)
                 trades_leg_id.append(0)
                 trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0
@@ -1483,6 +1569,12 @@ def _backtest_numba_core(o, h, l, c, sig,
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
             else:
                 pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
+            # Item #3: cost decomposition.
+            fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                1, entry_price, exit_price, qty,
+                fee_entry, fee_exit, funding_acc, slip,
+                use_forex, pnl)
+            if not use_forex:
                 funding_acc = 0.0
 
             trades_side.append(1)
@@ -1494,6 +1586,11 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_pnl.append(pnl)
             trades_leg_id.append(0)
             trades_tgid.append(len(trades_tgid))
+            trades_fee.append(fee_v)
+            trades_slip.append(slip_v)
+            trades_funding.append(fund_v)
+            trades_gross.append(gross_v)
+            trades_net.append(pnl)
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1511,6 +1608,12 @@ def _backtest_numba_core(o, h, l, c, sig,
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
             else:
                 pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
+            # Item #3: cost decomposition.
+            fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                -1, entry_price, exit_price, qty,
+                fee_entry, fee_exit, funding_acc, slip,
+                use_forex, pnl)
+            if not use_forex:
                 funding_acc = 0.0
 
             trades_side.append(-1)
@@ -1522,6 +1625,11 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_pnl.append(pnl)
             trades_leg_id.append(0)
             trades_tgid.append(len(trades_tgid))
+            trades_fee.append(fee_v)
+            trades_slip.append(slip_v)
+            trades_funding.append(fund_v)
+            trades_gross.append(gross_v)
+            trades_net.append(pnl)
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1542,6 +1650,12 @@ def _backtest_numba_core(o, h, l, c, sig,
         else:
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
+        # Item #3: cost decomposition (force-close on last bar; no
+        # funding_acc reset needed — kernel returns shortly after).
+        fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+            open_pos, entry_price, exit_price, qty,
+            fee_entry, fee_exit, funding_acc, slip,
+            use_forex, pnl)
         trades_side.append(open_pos)
         trades_ent.append(ent_bar)
         trades_exit.append(len(o)-1)
@@ -1551,6 +1665,11 @@ def _backtest_numba_core(o, h, l, c, sig,
         trades_pnl.append(pnl)
         trades_leg_id.append(0)
         trades_tgid.append(len(trades_tgid))
+        trades_fee.append(fee_v)
+        trades_slip.append(slip_v)
+        trades_funding.append(fund_v)
+        trades_gross.append(gross_v)
+        trades_net.append(pnl)
         if not use_forex:
             equity_list.append(equity_list[-1] + pnl)
 
@@ -1564,6 +1683,12 @@ def _backtest_numba_core(o, h, l, c, sig,
     pnl    = np.asarray(trades_pnl,   dtype=np.float64)
     legid  = np.asarray(trades_leg_id, dtype=np.int32)
     tgid   = np.asarray(trades_tgid,   dtype=np.int64)
+    # Item #3: cost decomposition arrays.
+    fees_arr  = np.asarray(trades_fee,     dtype=np.float64)
+    slips_arr = np.asarray(trades_slip,    dtype=np.float64)
+    funds_arr = np.asarray(trades_funding, dtype=np.float64)
+    gross_arr = np.asarray(trades_gross,   dtype=np.float64)
+    nets_arr  = np.asarray(trades_net,     dtype=np.float64)
 
     # equity curve & returns --------------------------------------------------
     if use_forex:
@@ -1592,10 +1717,14 @@ def _backtest_numba_core(o, h, l, c, sig,
     metrics_tuple = (tc, roi, pf, wr, expc, shp, dd, consistency)
 
 
-    # Pack trades as list of 9-tuples: 7 legacy fields plus leg_id and
-    # trade_group_id (item #2). Single-leg single-asset emits leg_id=0
-    # and trade_group_id=row_index; consumers ignore the tail via *_.
-    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl, legid, tgid))
+    # Pack trades as list of 14-tuples: 7 legacy fields, item #2's
+    # leg_id and trade_group_id, then item #3's 5 cost-decomposition
+    # fields (fee, slippage, funding, gross_pnl, net_pnl). pnl at
+    # index 6 and net_pnl at index 13 are equal by construction;
+    # consumers reading the legacy 7-tuple via slicing and the metric
+    # path indexing t[6] both stay correct.
+    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl, legid, tgid,
+                       fees_arr, slips_arr, funds_arr, gross_arr, nets_arr))
 
     return trades, metrics_tuple, eq_frac, rets, None
 
