@@ -29,6 +29,7 @@ from .regime import (  # noqa: E402,F401
 # the multi_asset=True route in the central dispatch table. Import it
 # eagerly so the route is wired before any user calls walk_forward_panel.
 from .orchestrator import walk_forward_panel  # noqa: E402,F401
+from .strategies import LongShortBasket, momentum_alpha  # noqa: E402,F401
 
 __all__ = [
     "load_panel",

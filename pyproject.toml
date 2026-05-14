@@ -45,5 +45,5 @@ Homepage = "https://github.com/DaruFinance/quant-research-framework"
 "Rust port" = "https://github.com/DaruFinance/quant-research-framework-rs"
 
 [tool.setuptools]
-packages = ["backtester", "backtester.panel"]
+packages = ["backtester", "backtester.panel", "backtester.panel.strategies"]
 py-modules = ["indicators_tradingview", "gen_synthetic", "binance_ohlc_downloader"]
