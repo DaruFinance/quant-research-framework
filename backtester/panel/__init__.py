@@ -25,6 +25,10 @@ from .regime import (  # noqa: E402,F401
     detect_regimes_panel_per_asset,
     detect_regimes_panel_market,
 )
+# The orchestrator submodule's import has a side effect: registering
+# the multi_asset=True route in the central dispatch table. Import it
+# eagerly so the route is wired before any user calls walk_forward_panel.
+from .orchestrator import walk_forward_panel  # noqa: E402,F401
 
 __all__ = [
     "load_panel",
@@ -34,4 +38,5 @@ __all__ = [
     "detect_regimes_panel",
     "detect_regimes_panel_per_asset",
     "detect_regimes_panel_market",
+    "walk_forward_panel",
 ]

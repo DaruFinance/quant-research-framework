@@ -48,9 +48,14 @@ def test_regime_route_resolves_to_regime_path():
 
 def test_unregistered_key_raises_keyerror_with_listing():
     """Asking for a route that doesn't exist must fail loudly with the
-    set of known routes, not silently fall back to a default."""
+    set of known routes, not silently fall back to a default.
+
+    We use ``record_costs=True`` as the sentinel "unregistered" key
+    because no item through Phase 2 #5(iter) flips that flag in the
+    dispatch key; if a future item starts registering record_costs
+    variants, this test will fail and we update the sentinel."""
     with pytest.raises(KeyError) as exc:
-        orchestrator.dispatch(RouteKey(regime=False, multi_asset=True))
+        orchestrator.dispatch(RouteKey(record_costs=True, hold_period_set=True))
     msg = str(exc.value)
     assert "no orchestrator route" in msg
     assert "registered keys" in msg
