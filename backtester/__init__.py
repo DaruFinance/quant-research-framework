@@ -24,6 +24,7 @@ from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
+from . import orchestrator  # item #5: WFO dispatch registry
 from numba import njit, types
 from numba.typed import List
 
@@ -2984,7 +2985,31 @@ def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] =
 
 
 def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
-    # Build robustness scenarios using the queued flags
+    """Walk-forward driver. Item #5 turned this into a thin dispatcher;
+    the regime / no-regime path bodies live in
+    ``_walk_forward_regime_path`` and ``_walk_forward_default_path``,
+    both registered in ``backtester.orchestrator`` under their
+    ``RouteKey`` flags.
+
+    The shared robustness-scenario setup remains here so registered
+    routes receive a fully-baked ``rb_scenarios`` list rather than
+    re-deriving it (which would re-read globals and risk drift).
+    """
+    rb_scenarios = _build_rb_scenarios()
+    key = orchestrator.RouteKey(
+        regime=(USE_WFO and USE_REGIME_SEG),
+        multi_asset=False,
+        multi_leg=False,
+        record_costs=False,
+        hold_period_set=False,
+    )
+    return orchestrator.dispatch(key)(df, met_is_baseline, eq_is_baseline, rb_scenarios)
+
+
+def _build_rb_scenarios():
+    """Extracted from the pre-#5 _walk_forward_impl body verbatim so
+    every registered route consumes an identical rb_scenarios list.
+    Reads the same module-level globals the inline version did."""
     if ROBUSTNESS_SCENARIOS:
         items = list(ROBUSTNESS_SCENARIOS.items())[:MAX_ROBUSTNESS_SCENARIOS]
     else:
@@ -3003,12 +3028,17 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
             continue
         label = _label_from_flags(flags)
         rb_scenarios.append((label, opts))
+    return rb_scenarios
 
+
+def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
+    """Regime + WFO path. Extracted from _walk_forward_impl in item #5;
+    body unchanged from the pre-refactor branch at v0.4.0+#3."""
     # ===== 1.  WFO **with** regime segmentation ============================
     # Rewritten in v0.2.0: WFO walks the standard cadence (candles or trades).
     # Regime segmentation only changes which per-regime LB is active for each
     # OOS bar; the WFO test/train boundaries are NOT shifted by regime changes.
-    if USE_WFO and USE_REGIME_SEG:
+    if True:  # preserved for diff-minimisation against pre-#5 source
         n           = len(df)
         start_total = n - OOS_CANDLES
         cur_start   = start_total
@@ -3118,6 +3148,10 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
         split_wfo_is = len(eq_seed) - 1
         return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
 
+
+def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
+    """No-regime path. Extracted from _walk_forward_impl in item #5;
+    body unchanged from the pre-refactor branch."""
     # ===== 2.  WFO **without** regime segmentation =========================
     n           = len(df)
     start_total = n - OOS_CANDLES
@@ -3193,6 +3227,21 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
 
     split_wfo_is = len(eq_seed) - 1
     return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
+
+
+# Register Phase 1 single-asset orchestrator routes (item #5). Each entry
+# wraps one of the two original _walk_forward_impl branches verbatim;
+# adding new entries (multi_asset=True, multi_leg=True, ...) is the
+# extension point for Phases 2-5.
+orchestrator.register(
+    orchestrator.RouteKey(regime=True),
+    _walk_forward_regime_path,
+)
+orchestrator.register(
+    orchestrator.RouteKey(regime=False),
+    _walk_forward_default_path,
+)
+
 
 def inject_news_candles(df: pd.DataFrame, seed: int | None = None) -> pd.DataFrame:
     """Return **new** DataFrame where every 5001000 bars a burst of 12 candles
