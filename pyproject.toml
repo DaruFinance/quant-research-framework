@@ -34,11 +34,16 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "hypothesis"]
 examples = ["scikit-learn"]
+# Item #1 (Phase 2): multi-asset panel plugin. xarray for the
+# time x asset x field N-D dataset; pyarrow for the bundled
+# DS-PANEL-3 Parquet fixtures. Pulled only when the user opts into
+# the panel plugin via `pip install quant-research-framework[panel]`.
+panel = ["xarray>=2024.0", "pyarrow>=14.0"]
 
 [project.urls]
 Homepage = "https://github.com/DaruFinance/quant-research-framework"
 "Rust port" = "https://github.com/DaruFinance/quant-research-framework-rs"
 
 [tool.setuptools]
-packages = ["backtester"]
+packages = ["backtester", "backtester.panel"]
 py-modules = ["indicators_tradingview", "gen_synthetic", "binance_ohlc_downloader"]
