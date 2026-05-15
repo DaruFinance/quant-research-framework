@@ -50,6 +50,20 @@ def load_onchain(
     - ``snapshot_sha256``: file-content hash at load time.
     - ``snapshot_mtime``: file mtime at load time.
     - ``metric``: which column we extracted.
+
+    .. warning::
+       Pandas (≥ 2.0) drops ``DataFrame.attrs`` whenever an operation
+       joins this frame with another frame whose ``attrs`` differ —
+       most notably :func:`pandas.concat` and :func:`DataFrame.merge`
+       with a fresh / different-source frame.  In practice this means
+       a downstream join of an on-chain frame with bar data drops the
+       pinning metadata silently.  ``copy()``, slicing, ``groupby``,
+       and elementwise arithmetic preserve attrs in current pandas,
+       but treat that as incidental — capture the pinning fields
+       into your own variables right after :func:`load_onchain`
+       returns rather than relying on them surviving downstream.
+       Same caveat applies to :func:`load_funding`, :func:`load_basis`,
+       and :func:`load_oi`; their ``attrs`` are set at load time only.
     """
     path = Path(path)
     if path.suffix == ".parquet":
