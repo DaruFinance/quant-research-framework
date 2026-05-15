@@ -42,11 +42,16 @@ panel = ["xarray>=2024.0", "pyarrow>=14.0", "scipy>=1.10"]
 # Item #9-#13 (Phase 3 pairs). Engle-Granger / Johansen / ADF via
 # statsmodels. Pulled when the user opts into the pairs plugin.
 pairs = ["xarray>=2024.0", "pyarrow>=14.0", "scipy>=1.10", "statsmodels>=0.14"]
+# Items #38-#43 (Phase 3 carry). Funding/basis/OI/on-chain loaders +
+# signal-model library. Only stdlib + numpy + pandas + pyarrow are
+# actually needed; we declare pyarrow for the bundled Parquet
+# fixtures so the extras line is self-contained.
+carry = ["pyarrow>=14.0"]
 
 [project.urls]
 Homepage = "https://github.com/DaruFinance/quant-research-framework"
 "Rust port" = "https://github.com/DaruFinance/quant-research-framework-rs"
 
 [tool.setuptools]
-packages = ["backtester", "backtester.panel", "backtester.panel.strategies", "backtester.pairs"]
+packages = ["backtester", "backtester.panel", "backtester.panel.strategies", "backtester.pairs", "backtester.carry", "backtester.carry.models"]
 py-modules = ["indicators_tradingview", "gen_synthetic", "binance_ohlc_downloader"]
