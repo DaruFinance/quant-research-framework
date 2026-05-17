@@ -91,6 +91,17 @@ LEGACY_SIDE_BUG = False   # RRR-optimisation side comparison: the original
 # Forex mode: when True, use pip-based risk units.
 FOREX_MODE = False        # Convert percentage distances to pip distances.
 
+CLAMP_RESULTS = False     # Conceptual gap-handling for the crypto path. When
+                          # True, every realized trade's pnl-before-costs is
+                          # clipped to [-1R, +RRR*R] (R = entry_price *
+                          # sl_percentage / 100). This mirrors the R-unit
+                          # clamping that forex mode applies unconditionally,
+                          # so a bar that gaps through SL/TP cannot record a
+                          # loss larger than 1R or a gain larger than the
+                          # configured RRR. No effect when FOREX_MODE is True
+                          # (forex already clamps on every exit) or when
+                          # SL_PERCENTAGE is 0.
+
 FILTER_REGIMES     = False      # works only when USE_REGIME_SEG == True
 FILTER_DIRECTIONS  = False      # blocks long / short based on IS stats
 
@@ -271,6 +282,11 @@ class Config:
     forex_mode: bool = False
     pip_size: float = 0.0001
 
+    # Clamp realized pnl-before-costs to [-1R, +RRR*R] in the crypto path.
+    # Conceptual fill model for gap-prone instruments; no-op in forex mode
+    # (forex already clamps on every exit).
+    clamp_results: bool = False
+
     # Regime / filters
     filter_regimes: bool = False
     filter_directions: bool = False
@@ -334,6 +350,7 @@ class Config:
         'legacy_side_bug': 'LEGACY_SIDE_BUG',
         'forex_mode': 'FOREX_MODE',
         'pip_size': 'PIP_SIZE',
+        'clamp_results': 'CLAMP_RESULTS',
         'filter_regimes': 'FILTER_REGIMES',
         'filter_directions': 'FILTER_DIRECTIONS',
         'use_regime_seg': 'USE_REGIME_SEG',
@@ -1308,6 +1325,26 @@ def _decompose_costs(side_val, entry_price, exit_price, qty,
 
 
 @njit(cache=True)
+def _clamp_crypto_pnl(side_val, entry_price, exit_price, qty,
+                      sl_perc, tp_perc,
+                      fee_entry, fee_exit, funding_acc):
+    """Crypto-path R-unit clamp. Returns net pnl with pnl-before-costs
+    clipped to [-1R, +RRR*R] where R = entry_price * sl_perc/100. Mirrors
+    the forex closure's trade_res clip so gap-prone instruments cannot
+    exceed the configured R bounds. Caller must guarantee sl_perc > 0.
+    """
+    direction = (exit_price - entry_price) if side_val == 1 else (entry_price - exit_price)
+    r_size = entry_price * (sl_perc / 100.0)
+    rrr = tp_perc / sl_perc
+    r_value = (qty * direction) / (qty * r_size)
+    if r_value < -1.0:
+        r_value = -1.0
+    elif r_value > rrr:
+        r_value = rrr
+    return r_value * qty * r_size - (fee_entry + fee_exit + funding_acc)
+
+
+@njit(cache=True)
 def _backtest_numba_core(o, h, l, c, sig,
                          session_idxs, session_end, news_close, funding_mask,
                          # config flags -------------------------------------------------
@@ -1319,6 +1356,8 @@ def _backtest_numba_core(o, h, l, c, sig,
                          position_size, account_size,
                          # item #46: hold-period bin -----------------------------------
                          max_hold_bars,
+                         # clamp realized pnl-before-costs to [-1R, +RRR*R] (crypto only)
+                         clamp_results,
                          # carryin -----------------------------------------------------
                          carry_side, carry_ent_idx, carry_entry_price):
     """
@@ -1446,6 +1485,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                     else:
                         RRR = tp_perc / sl_perc
                         pnl = position_size_fx * RRR - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(open_pos, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                           - (fee_entry + fee_exit + funding_acc)
@@ -1498,6 +1541,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                     trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                     trade_res       = max(min(trade_res, RRR), -1)
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(-1, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
                 # Item #3: cost decomposition.
@@ -1547,6 +1594,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                     trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                     trade_res       = max(min(trade_res, RRR), -1)
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(1, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
                 # Item #3: cost decomposition.
@@ -1593,6 +1644,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                 trade_res       = max(min(trade_res, RRR), -1)
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+            elif clamp_results and sl_perc > 0.0:
+                pnl = _clamp_crypto_pnl(1, entry_price, exit_price, qty,
+                                         sl_perc, tp_perc,
+                                         fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
             # Item #3: cost decomposition.
@@ -1632,6 +1687,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                 trade_res       = max(min(trade_res, RRR), -1)
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+            elif clamp_results and sl_perc > 0.0:
+                pnl = _clamp_crypto_pnl(-1, entry_price, exit_price, qty,
+                                         sl_perc, tp_perc,
+                                         fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
             # Item #3: cost decomposition.
@@ -1673,6 +1732,10 @@ def _backtest_numba_core(o, h, l, c, sig,
             trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
             trade_res       = max(min(trade_res, RRR), -1)
             pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+        elif clamp_results and sl_perc > 0.0:
+            pnl = _clamp_crypto_pnl(open_pos, entry_price, exit_price, qty,
+                                     sl_perc, tp_perc,
+                                     fee_entry, fee_exit, funding_acc)
         else:
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
@@ -1780,6 +1843,7 @@ def backtest(df, raw_sig, carry_in=None):
         1.0 if FOREX_MODE else RISK_AMOUNT,
         ACCOUNT_SIZE,
         MAX_HOLD_BARS,                                  # item #46
+        CLAMP_RESULTS,                                  # crypto R-clamp toggle
         carry_side_num, carry_ent, carry_price
     )
 
