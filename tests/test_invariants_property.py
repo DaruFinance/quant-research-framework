@@ -53,7 +53,7 @@ def test_max_hold_bars_no_leak_property(seed: int, n: int, lb: int, max_hold: in
     """Every trade with exit_reason = HOLD_PERIOD must satisfy
     exit_idx - entry_idx == max_hold; other trades must satisfy
     exit_idx - entry_idx <= max_hold (they exited earlier via
-    SL/TP/signal/news/session). Because the kernel reads only `idx` and
+    SL/TP/signal/session). Because the kernel reads only `idx` and
     `ent_bar` for the cap decision, the property is also a strong
     lookahead guard."""
     df = _df_from(seed, n)
