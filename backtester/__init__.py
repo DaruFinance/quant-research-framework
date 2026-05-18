@@ -54,7 +54,6 @@ OPT_METRIC          = "Sharpe"              # ROI, PF, Sharpe, WinRate, Exp, Max
 MIN_TRADES          = 10
 SMART_OPTIMIZATION  = True    # True to skip spiky optimisations
 DRAWDOWN_CONSTRAINT = None    # Skip optimizations with a drawdown higher than the value input. Use "None" for OFF
-NEWS_AVOIDER        = False      # Closes trades 2 candles prior to red folder news
 
 PRINT_EQUITY_CURVE  = True                       # plot
 USE_MONTE_CARLO     = True                       # on first IS only
@@ -276,7 +275,6 @@ class Config:
     news_candles_injection: bool = False
     entry_drift: bool = False
     indicator_variance: bool = False
-    news_avoider: bool = False
 
     # Walk-forward
     use_wfo: bool = True
@@ -336,7 +334,6 @@ class Config:
         'news_candles_injection': 'NEWS_CANDLES_INJECTION',
         'entry_drift': 'ENTRY_DRIFT',
         'indicator_variance': 'INDICATOR_VARIANCE',
-        'news_avoider': 'NEWS_AVOIDER',
         'use_wfo': 'USE_WFO',
         'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
         'wfo_trigger_val': 'WFO_TRIGGER_VAL',
@@ -467,7 +464,6 @@ _runtime_state: dict[str, Any] = {
     'last_unfiltered_raw': None,
     '_last_df': None,
     '_last_lb': None,
-    'NEWS_FLAGS': None,
 }
 
 def in_session(ts: datetime) -> bool:
@@ -1199,15 +1195,7 @@ def _prepare_backtest_inputs(df, sig):
         session_idxs     = np.arange(n, dtype=np.int64)
         session_end_mask = np.zeros(n, dtype=np.bool_)
 
-    # 3 news flags ------------------------------------------------------------
-    if NEWS_AVOIDER:
-        news_flags        = df["is_news_candle"].to_numpy(np.bool_)
-        force_close_news  = np.roll(news_flags, -2)
-        force_close_news[-2:] = False  # last two bars have no +2 offset
-    else:
-        force_close_news = np.zeros(n, dtype=np.bool_)
-
-    # 4 signals ---------------------------------------------------------------
+    # 3 signals ---------------------------------------------------------------
     sig_arr = sig.astype(np.int8)   # ensure small dtype
 
     return dict(
@@ -1215,7 +1203,6 @@ def _prepare_backtest_inputs(df, sig):
         sig=sig_arr,
         session_idxs=session_idxs,
         session_end=session_end_mask,
-        news_close=force_close_news,
         funding_mask=funding_mask,
         n=n
     )
@@ -1250,9 +1237,9 @@ def _five_segment_sums(vec):
 
 @njit(cache=True)
 def _backtest_numba_core(o, h, l, c, sig,
-                         session_idxs, session_end, news_close, funding_mask,
+                         session_idxs, session_end, funding_mask,
                          # config flags -------------------------------------------------
-                         use_forex, use_sessions, use_news, use_regime,
+                         use_forex, use_sessions, use_regime,
                          use_sl, use_tp,
                          # numeric constants --------------------------------------------
                          sl_perc, tp_perc, pip_size,
@@ -1311,16 +1298,16 @@ def _backtest_numba_core(o, h, l, c, sig,
         if use_regime and idx < 200:
             continue
 
-        # forced exit for news / session end. v0.2.3 fix: drop the prior
+        # forced exit for session end. v0.2.3 fix: drop the prior
         # `and code != 0` guard — the force-close should fire whenever an
-        # open position exists at a session-end / news-close bar, regardless
-        # of whether the strategy happens to emit a signal on that same bar.
+        # open position exists at a session-end bar, regardless of whether
+        # the strategy happens to emit a signal on that same bar.
         # Prior behaviour silently carried positions across out-of-session
         # windows; no published research used TRADE_SESSIONS so this is a
         # zero-cost correctness fix.
         end_bar_flag = session_end[idx] if use_sessions else False
         if open_pos != 0:
-            if (use_news and news_close[idx]) or (use_sessions and end_bar_flag):
+            if use_sessions and end_bar_flag:
                 code = 2 if open_pos == 1 else 4
         if use_sessions and (code in (1, 3)) and end_bar_flag:
             code = 0                                    # block new entry
@@ -1590,9 +1577,9 @@ def backtest(df, raw_sig, carry_in=None):
 
     trades, metrics_tup, eq_frac, rets, _ = _backtest_numba_core(
         prep["o"], prep["h"], prep["l"], prep["c"], prep["sig"],
-        prep["session_idxs"], prep["session_end"], prep["news_close"],
+        prep["session_idxs"], prep["session_end"],
         prep["funding_mask"],
-        FOREX_MODE, TRADE_SESSIONS, NEWS_AVOIDER, USE_REGIME_SEG,
+        FOREX_MODE, TRADE_SESSIONS, USE_REGIME_SEG,
         USE_SL, USE_TP,
         SL_PERCENTAGE, TP_PERCENTAGE, PIP_SIZE,
         FEE_PCT/100, SLIPPAGE_PCT*(PIP_SIZE if FOREX_MODE else 0.01),
@@ -3408,26 +3395,7 @@ def _main_impl():
 
     df = age_dataset(df, AGE_DATASET)
 
-    # Was: `global NEWS_FLAGS`. NEWS_FLAGS is per-run state, not config,
-    # so it lives in _runtime_state. Module-level `NEWS_FLAGS = None`
-    # alias is still maintained for back-compat (set via `globals()`).
-    # only mark traded bars
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
-    # compute 14-bar ATR & flag spikes at :00/:30
-    # compute 14-bar ATR & flag spikes at :00/:30
-    df['ATR14'] = compute_atr(df, 14)
-    df['is_news_candle'] = (
-        df['is_traded']
-        & (df['ATR14'] > df['ATR14'].shift(1) * 1.1)
-        & (df['time'].dt.minute % 30 == 0)
-    )
-
-    # expose the news-flag array for all later routines via _runtime_state.
-    # Mirror to the module-level NEWS_FLAGS attribute so any external
-    # consumer or legacy code still sees it on `bt.NEWS_FLAGS`.
-    _runtime_state['NEWS_FLAGS'] = df['is_news_candle'].values
-    globals()['NEWS_FLAGS'] = _runtime_state['NEWS_FLAGS']
-
 
     # 1) baseline run
     base = classic_single_run(df)
