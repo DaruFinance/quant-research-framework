@@ -36,6 +36,10 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          # Multi-asset substrate extras (panel/pairs/carry) so the
+          # backtester.{panel,pairs,carry} test modules import (statsmodels,
+          # xarray, pyarrow, scipy).
+          pip install -e ".[panel,pairs,carry]"
           pip install pytest hypothesis
       - name: pytest
         # tests/conftest.py auto-generates a synthetic CSV and sets
@@ -69,6 +73,9 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          # Multi-asset substrate extras so the panel/pairs/carry test
+          # modules import (statsmodels, xarray, pyarrow, scipy).
+          pip install -e ".[panel,pairs,carry]"
           pip install pytest
 
       - name: Set up Rust toolchain
