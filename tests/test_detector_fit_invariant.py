@@ -44,7 +44,7 @@ def _make_synthetic_bars(seed: int = 0, n: int = 600) -> pd.DataFrame:
     high = p * (1 + np.abs(rng.normal(0, 0.001, n)))
     low  = p * (1 - np.abs(rng.normal(0, 0.001, n)))
     op   = np.concatenate([[100.0], p[:-1]])
-    times = pd.date_range("2024-01-01", periods=n, freq="1H")
+    times = pd.date_range("2024-01-01", periods=n, freq="1h")
     df = pd.DataFrame({
         "time":  times,
         "open":  op,

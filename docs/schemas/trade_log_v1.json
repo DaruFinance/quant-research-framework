@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DaruFinance/quant-research-framework/blob/v2-main/docs/schemas/trade_log_v1.json",
+  "title": "Trade-log v1 — per-leg row schema",
+  "description": "The shared trade-log row schema frozen by Phase 1 item #2 (multi-leg ledger) and item #3 (per-leg cost decomposition). Every backtest in this framework — and every cross-language port (`quant-research-framework-rs`) — emits per-leg rows in this 14-column form. Downstream consumers (REPO 2 quant-mm-simulator + quant-mm-simulator-rs, the strategy-pnl-daily-rs ETL, the verification gate logs) read this contract and nothing else; new fields can be added in v2 only as additive tail columns to preserve byte-for-byte parity of legacy 7-tuple loaders.\n\nReferences: backtester/ledger.py (Python source of truth) and src/lib.rs Trade struct (Rust mirror) at tag v0.7.0-pairs-carry. The kernel-emitted 9-tuple (item #2) is a strict prefix of this 14-tuple; the 5 cost-decomposition fields (item #3) trail at the end so that legacy 7-tuple and 9-tuple consumers continue to parse correctly via aggregate_legs.",
+  "type": "object",
+  "required": [
+    "side", "entry_idx", "exit_idx",
+    "entry_price", "exit_price", "qty", "pnl",
+    "leg_id", "trade_group_id",
+    "fee", "slippage", "funding", "gross_pnl", "net_pnl"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "side": {
+      "type": "integer",
+      "enum": [-1, 1],
+      "description": "+1 long, -1 short. Signed; never 0."
+    },
+    "entry_idx": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Bar index (or sim-time tick) at which the leg opens. Causal: every input feature consulted at decision time has index <= entry_idx."
+    },
+    "exit_idx": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Bar index (or sim-time tick) at which the leg closes. Always >= entry_idx."
+    },
+    "entry_price": {
+      "type": "number",
+      "description": "Per-unit fill price at entry, in quote currency."
+    },
+    "exit_price": {
+      "type": "number",
+      "description": "Per-unit fill price at exit, in quote currency."
+    },
+    "qty": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Filled quantity in base asset units. Float (continuous fractional inventory; see Phase 4 item #20)."
+    },
+    "pnl": {
+      "type": "number",
+      "description": "Realised per-leg PnL after costs. Equal to net_pnl by construction; kept under both names for backwards compatibility with legacy 7-tuple consumers."
+    },
+    "leg_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sequence of this leg within its trade group. 0-based. Always 0 for single-leg trades (item #2 default)."
+    },
+    "trade_group_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Joint-trade identifier. All legs of one logical trade share the same group_id. Single-leg single-asset runs use the kernel's row index here so each leg is its own group — preserving v0.4.0 byte-level CSV equivalence."
+    },
+    "fee": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Exchange fee for this leg in quote currency (always >= 0)."
+    },
+    "slippage": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Slippage cost for this leg in quote currency (always >= 0). Computed from realized fill - mid at decision time."
+    },
+    "funding": {
+      "type": "number",
+      "description": "Funding cost for this leg in quote currency. Signed; positive when our position pays, negative when we receive."
+    },
+    "gross_pnl": {
+      "type": "number",
+      "description": "Pre-cost realised PnL: qty * side * (exit_price - entry_price)."
+    },
+    "net_pnl": {
+      "type": "number",
+      "description": "Post-cost realised PnL. Invariant: gross_pnl - fee - slippage - funding == net_pnl, to f64 numerical noise."
+    }
+  },
+  "$comment": "Invariants enforced at runtime by tests/test_invariants.py and tests/test_invariants_property.py: (1) gross_pnl - fee - slippage - funding == net_pnl ± 1e-12 of |gross_pnl|; (2) pnl == net_pnl; (3) for any leg, every consulted bar index is <= entry_idx (the cornerstone leak invariant from item #14)."
+}

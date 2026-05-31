@@ -24,6 +24,7 @@ from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
+from . import orchestrator  # item #5: WFO dispatch registry
 from numba import njit, types
 from numba.typed import List
 
@@ -43,6 +44,12 @@ TRADE_SESSIONS = False                # if True, only trade during NY session
 SESSION_START   = "8:00"            # NY open time (HH:MM)
 SESSION_END     = "16:50"            # NY close time (HH:MM)
 NY_TZ           = pytz.timezone("America/New_York")
+
+# Item #46: maximum hold period in bars. 0 = no force-close (engine
+# behaves as pre-#46). When > 0, the kernel emits a code-2/4 close at
+# bar i for any open position with (i - ent_bar) >= MAX_HOLD_BARS.
+# Priority: news/session > hold-period > SL/TP intrabar > signal-driven.
+MAX_HOLD_BARS  = 0
 DEFAULT_LB          = 50                         # for RAW baseline
 LOOKBACK_RANGE      = (int(DEFAULT_LB*0.25), int(DEFAULT_LB*1.5)+1)
 
@@ -82,6 +89,17 @@ LEGACY_SIDE_BUG = False   # RRR-optimisation side comparison: the original
 
 # Forex mode: when True, use pip-based risk units.
 FOREX_MODE = False        # Convert percentage distances to pip distances.
+
+CLAMP_RESULTS = False     # Conceptual gap-handling for the crypto path. When
+                          # True, every realized trade's pnl-before-costs is
+                          # clipped to [-1R, +RRR*R] (R = entry_price *
+                          # sl_percentage / 100). This mirrors the R-unit
+                          # clamping that forex mode applies unconditionally,
+                          # so a bar that gaps through SL/TP cannot record a
+                          # loss larger than 1R or a gain larger than the
+                          # configured RRR. No effect when FOREX_MODE is True
+                          # (forex already clamps on every exit) or when
+                          # SL_PERCENTAGE is 0.
 
 FILTER_REGIMES     = False      # works only when USE_REGIME_SEG == True
 FILTER_DIRECTIONS  = False      # blocks long / short based on IS stats
@@ -263,6 +281,11 @@ class Config:
     forex_mode: bool = False
     pip_size: float = 0.0001
 
+    # Clamp realized pnl-before-costs to [-1R, +RRR*R] in the crypto path.
+    # Conceptual fill model for gap-prone instruments; no-op in forex mode
+    # (forex already clamps on every exit).
+    clamp_results: bool = False
+
     # Regime / filters
     filter_regimes: bool = False
     filter_directions: bool = False
@@ -325,6 +348,7 @@ class Config:
         'legacy_side_bug': 'LEGACY_SIDE_BUG',
         'forex_mode': 'FOREX_MODE',
         'pip_size': 'PIP_SIZE',
+        'clamp_results': 'CLAMP_RESULTS',
         'filter_regimes': 'FILTER_REGIMES',
         'filter_directions': 'FILTER_DIRECTIONS',
         'use_regime_seg': 'USE_REGIME_SEG',
@@ -569,10 +593,13 @@ def _safe_append_or_write_trade_csv(df_export: pd.DataFrame, path: str, write_he
 
 def _metrics_from_trades(trades):
     # 1) per-trade returns in R-units vs USD
+    # Item #2: trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
+    # leg_id, tgid). pnl is at index 6; do not use *_, pnl which would
+    # capture tgid as pnl. Indexing by [6] is robust to future widening.
     if FOREX_MODE:
-        rets = np.array([pnl / POSITION_SIZE for *_, pnl in trades], dtype=float)
+        rets = np.array([t[6] / POSITION_SIZE for t in trades], dtype=float)
     else:
-        rets = np.array([pnl / ACCOUNT_SIZE for *_, pnl in trades], dtype=float)
+        rets = np.array([t[6] / ACCOUNT_SIZE for t in trades], dtype=float)
     tc   = len(rets)
     wr   = np.mean(rets > 0) if tc else 0.0
     roi  = rets.sum() if tc else 0.0   # sum of R or sum of fracreturns
@@ -1004,6 +1031,10 @@ def get_regimes(df, length=8):
     return regimes
 
 
+from backtester.invariants import registers_invariant
+
+
+@registers_invariant(name="default_regime_detector", data_kind="ohlc_df")
 def detect_regimes(df: pd.DataFrame) -> pd.Series:
     """
     Pluggable regime detector. Returns a pd.Series of labels (strings drawn
@@ -1014,6 +1045,13 @@ def detect_regimes(df: pd.DataFrame) -> pd.Series:
       * Return labels that are a subset of `REGIME_LABELS` (length 2..5)
       * Be free of look-ahead — only use information available at bar i-1 or
         earlier when labelling bar i.
+
+    The ``@registers_invariant`` decorator (item #14) auto-registers this
+    function with the lookahead-leak harness so its claim of lookahead
+    freeness is property-tested every CI run. Custom detectors plugged in
+    via ``bt.detect_regimes = my_detector`` should also be decorated to
+    inherit the same gate.
+
     Override pattern (in your strategy file):
         import backtester as bt
         bt.REGIME_LABELS  = ['Calm', 'Volatile']
@@ -1236,6 +1274,64 @@ def _five_segment_sums(vec):
 
 
 @njit(cache=True)
+def _decompose_costs(side_val, entry_price, exit_price, qty,
+                     fee_entry, fee_exit, funding_acc, slip,
+                     use_forex, pnl):
+    """Item #3 cost decomposition for a single trade leg.
+
+    Returns (fee, slippage, funding, gross_pnl) such that:
+        gross_pnl - fee - slippage - funding == pnl   (to fp tolerance)
+
+    Crypto (use_forex=False):
+        fee       = fee_entry + fee_exit
+        slippage  = qty * slip * (raw_entry + raw_exit)
+                    with raw_* recovered via the inverse slippage adjust:
+                      raw_entry = entry_price / (1 + slip)  for long entry
+                      raw_exit  = exit_price  / (1 - slip)  for long exit
+                      (mirror for short)
+        funding   = funding_acc (caller resets to 0 after this returns)
+        gross_pnl = pnl + fee + slippage + funding (identity check)
+
+    Forex (use_forex=True):
+        R-unit pnl already folds slippage and funding into trade_res;
+        we surface slippage = funding = 0 and gross_pnl = pnl + fee.
+    """
+    fee_total = fee_entry + fee_exit
+    if use_forex:
+        return fee_total, 0.0, 0.0, pnl + fee_total
+    if side_val == 1:
+        raw_entry = entry_price / (1.0 + slip)
+        raw_exit  = exit_price  / (1.0 - slip)
+    else:
+        raw_entry = entry_price / (1.0 - slip)
+        raw_exit  = exit_price  / (1.0 + slip)
+    slippage  = qty * slip * (raw_entry + raw_exit)
+    funding   = funding_acc
+    gross_pnl = pnl + fee_total + slippage + funding
+    return fee_total, slippage, funding, gross_pnl
+
+
+@njit(cache=True)
+def _clamp_crypto_pnl(side_val, entry_price, exit_price, qty,
+                      sl_perc, tp_perc,
+                      fee_entry, fee_exit, funding_acc):
+    """Crypto-path R-unit clamp. Returns net pnl with pnl-before-costs
+    clipped to [-1R, +RRR*R] where R = entry_price * sl_perc/100. Mirrors
+    the forex closure's trade_res clip so gap-prone instruments cannot
+    exceed the configured R bounds. Caller must guarantee sl_perc > 0.
+    """
+    direction = (exit_price - entry_price) if side_val == 1 else (entry_price - exit_price)
+    r_size = entry_price * (sl_perc / 100.0)
+    rrr = tp_perc / sl_perc
+    r_value = (qty * direction) / (qty * r_size)
+    if r_value < -1.0:
+        r_value = -1.0
+    elif r_value > rrr:
+        r_value = rrr
+    return r_value * qty * r_size - (fee_entry + fee_exit + funding_acc)
+
+
+@njit(cache=True)
 def _backtest_numba_core(o, h, l, c, sig,
                          session_idxs, session_end, funding_mask,
                          # config flags -------------------------------------------------
@@ -1245,6 +1341,10 @@ def _backtest_numba_core(o, h, l, c, sig,
                          sl_perc, tp_perc, pip_size,
                          fee_rate, slip, funding_rate,
                          position_size, account_size,
+                         # item #46: hold-period bin -----------------------------------
+                         max_hold_bars,
+                         # clamp realized pnl-before-costs to [-1R, +RRR*R] (crypto only)
+                         clamp_results,
                          # carryin -----------------------------------------------------
                          carry_side, carry_ent_idx, carry_entry_price):
     """
@@ -1259,6 +1359,26 @@ def _backtest_numba_core(o, h, l, c, sig,
     trades_xp    = List.empty_list(types.float64)     #  exit price
     trades_qty   = List.empty_list(types.float64)     #  quantity
     trades_pnl   = List.empty_list(types.float64)     #  pnl
+    # Item #2: per-leg metadata. Single-leg single-asset mode emits
+    # leg_id=0 and trade_group_id=row_index, so downstream aggregation
+    # via backtester.ledger.aggregate_legs is uniform across single- and
+    # multi-leg trades. Metric output stays bit-identical to v0.4.0.
+    trades_leg_id = List.empty_list(types.int32)
+    trades_tgid   = List.empty_list(types.int64)
+    # Item #3: cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
+    # slippage = qty*slip*(raw_entry+raw_exit) recovered from slipped
+    # prices via entry_price/(1+slip) for long entries (and the obvious
+    # mirror for shorts); funding = funding_acc accrued during the
+    # position's life. Decomposition identity:
+    #     gross_pnl - fee - slippage - funding == net_pnl  (to 1e-9)
+    # net_pnl is stored explicitly alongside the existing pnl field for
+    # API symmetry; they are numerically equal by construction. Forex
+    # mode emits slippage=funding=0 (R-unit math folds those terms in).
+    trades_fee     = List.empty_list(types.float64)
+    trades_slip    = List.empty_list(types.float64)
+    trades_funding = List.empty_list(types.float64)
+    trades_gross   = List.empty_list(types.float64)
+    trades_net     = List.empty_list(types.float64)
 
     equity_list  = List()
     funding_acc  = 0.0
@@ -1309,6 +1429,12 @@ def _backtest_numba_core(o, h, l, c, sig,
         if open_pos != 0:
             if use_sessions and end_bar_flag:
                 code = 2 if open_pos == 1 else 4
+            # Item #46: hold-period force-close. Pure index arithmetic
+            # (idx and ent_bar are both at or before this bar), so
+            # lookahead-free by construction. Only fires if session
+            # didn't already set code via the elif chain semantics.
+            elif max_hold_bars > 0 and (idx - ent_bar) >= max_hold_bars:
+                code = 2 if open_pos == 1 else 4
         if use_sessions and (code in (1, 3)) and end_bar_flag:
             code = 0                                    # block new entry
 
@@ -1346,9 +1472,20 @@ def _backtest_numba_core(o, h, l, c, sig,
                     else:
                         RRR = tp_perc / sl_perc
                         pnl = position_size_fx * RRR - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(open_pos, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                           - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition BEFORE funding_acc reset so
+                # the helper sees the funding actually paid on this leg.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    open_pos, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 # save trade
@@ -1359,6 +1496,13 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
 
                 if use_forex:
                     # equity as fraction of risk
@@ -1384,8 +1528,18 @@ def _backtest_numba_core(o, h, l, c, sig,
                     trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                     trade_res       = max(min(trade_res, RRR), -1)
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(-1, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    -1, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 # store
@@ -1396,6 +1550,13 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0            # flat
@@ -1420,8 +1581,18 @@ def _backtest_numba_core(o, h, l, c, sig,
                     trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                     trade_res       = max(min(trade_res, RRR), -1)
                     pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+                elif clamp_results and sl_perc > 0.0:
+                    pnl = _clamp_crypto_pnl(1, entry_price, exit_price, qty,
+                                             sl_perc, tp_perc,
+                                             fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
+                # Item #3: cost decomposition.
+                fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                    1, entry_price, exit_price, qty,
+                    fee_entry, fee_exit, funding_acc, slip,
+                    use_forex, pnl)
+                if not use_forex:
                     funding_acc = 0.0
 
                 trades_side.append(1)
@@ -1431,6 +1602,13 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trades_xp.append(exit_price)
                 trades_qty.append(qty)
                 trades_pnl.append(pnl)
+                trades_leg_id.append(0)
+                trades_tgid.append(len(trades_tgid))
+                trades_fee.append(fee_v)
+                trades_slip.append(slip_v)
+                trades_funding.append(fund_v)
+                trades_gross.append(gross_v)
+                trades_net.append(pnl)
                 if not use_forex:
                     equity_list.append(equity_list[-1] + pnl)
                 open_pos = 0
@@ -1453,8 +1631,18 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                 trade_res       = max(min(trade_res, RRR), -1)
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+            elif clamp_results and sl_perc > 0.0:
+                pnl = _clamp_crypto_pnl(1, entry_price, exit_price, qty,
+                                         sl_perc, tp_perc,
+                                         fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
+            # Item #3: cost decomposition.
+            fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                1, entry_price, exit_price, qty,
+                fee_entry, fee_exit, funding_acc, slip,
+                use_forex, pnl)
+            if not use_forex:
                 funding_acc = 0.0
 
             trades_side.append(1)
@@ -1464,6 +1652,13 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_xp.append(exit_price)
             trades_qty.append(qty)
             trades_pnl.append(pnl)
+            trades_leg_id.append(0)
+            trades_tgid.append(len(trades_tgid))
+            trades_fee.append(fee_v)
+            trades_slip.append(slip_v)
+            trades_funding.append(fund_v)
+            trades_gross.append(gross_v)
+            trades_net.append(pnl)
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1479,8 +1674,18 @@ def _backtest_numba_core(o, h, l, c, sig,
                 trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
                 trade_res       = max(min(trade_res, RRR), -1)
                 pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+            elif clamp_results and sl_perc > 0.0:
+                pnl = _clamp_crypto_pnl(-1, entry_price, exit_price, qty,
+                                         sl_perc, tp_perc,
+                                         fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
+            # Item #3: cost decomposition.
+            fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+                -1, entry_price, exit_price, qty,
+                fee_entry, fee_exit, funding_acc, slip,
+                use_forex, pnl)
+            if not use_forex:
                 funding_acc = 0.0
 
             trades_side.append(-1)
@@ -1490,6 +1695,13 @@ def _backtest_numba_core(o, h, l, c, sig,
             trades_xp.append(exit_price)
             trades_qty.append(qty)
             trades_pnl.append(pnl)
+            trades_leg_id.append(0)
+            trades_tgid.append(len(trades_tgid))
+            trades_fee.append(fee_v)
+            trades_slip.append(slip_v)
+            trades_funding.append(fund_v)
+            trades_gross.append(gross_v)
+            trades_net.append(pnl)
             if not use_forex:
                 equity_list.append(equity_list[-1] + pnl)
             open_pos = 0
@@ -1507,9 +1719,19 @@ def _backtest_numba_core(o, h, l, c, sig,
             trade_res       = (price_move_pips / (RRR*stop_pips)) * RRR
             trade_res       = max(min(trade_res, RRR), -1)
             pnl = trade_res * position_size_fx - (fee_entry + fee_exit)
+        elif clamp_results and sl_perc > 0.0:
+            pnl = _clamp_crypto_pnl(open_pos, entry_price, exit_price, qty,
+                                     sl_perc, tp_perc,
+                                     fee_entry, fee_exit, funding_acc)
         else:
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
+        # Item #3: cost decomposition (force-close on last bar; no
+        # funding_acc reset needed — kernel returns shortly after).
+        fee_v, slip_v, fund_v, gross_v = _decompose_costs(
+            open_pos, entry_price, exit_price, qty,
+            fee_entry, fee_exit, funding_acc, slip,
+            use_forex, pnl)
         trades_side.append(open_pos)
         trades_ent.append(ent_bar)
         trades_exit.append(len(o)-1)
@@ -1517,6 +1739,13 @@ def _backtest_numba_core(o, h, l, c, sig,
         trades_xp.append(exit_price)
         trades_qty.append(qty)
         trades_pnl.append(pnl)
+        trades_leg_id.append(0)
+        trades_tgid.append(len(trades_tgid))
+        trades_fee.append(fee_v)
+        trades_slip.append(slip_v)
+        trades_funding.append(fund_v)
+        trades_gross.append(gross_v)
+        trades_net.append(pnl)
         if not use_forex:
             equity_list.append(equity_list[-1] + pnl)
 
@@ -1528,6 +1757,14 @@ def _backtest_numba_core(o, h, l, c, sig,
     xp     = np.asarray(trades_xp,    dtype=np.float64)
     qtys   = np.asarray(trades_qty,   dtype=np.float64)
     pnl    = np.asarray(trades_pnl,   dtype=np.float64)
+    legid  = np.asarray(trades_leg_id, dtype=np.int32)
+    tgid   = np.asarray(trades_tgid,   dtype=np.int64)
+    # Item #3: cost decomposition arrays.
+    fees_arr  = np.asarray(trades_fee,     dtype=np.float64)
+    slips_arr = np.asarray(trades_slip,    dtype=np.float64)
+    funds_arr = np.asarray(trades_funding, dtype=np.float64)
+    gross_arr = np.asarray(trades_gross,   dtype=np.float64)
+    nets_arr  = np.asarray(trades_net,     dtype=np.float64)
 
     # equity curve & returns --------------------------------------------------
     if use_forex:
@@ -1556,8 +1793,14 @@ def _backtest_numba_core(o, h, l, c, sig,
     metrics_tuple = (tc, roi, pf, wr, expc, shp, dd, consistency)
 
 
-    # pack trades as list of tuples for identical API
-    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl))
+    # Pack trades as list of 14-tuples: 7 legacy fields, item #2's
+    # leg_id and trade_group_id, then item #3's 5 cost-decomposition
+    # fields (fee, slippage, funding, gross_pnl, net_pnl). pnl at
+    # index 6 and net_pnl at index 13 are equal by construction;
+    # consumers reading the legacy 7-tuple via slicing and the metric
+    # path indexing t[6] both stay correct.
+    trades = list(zip(side, ent, exi, ep, xp, qtys, pnl, legid, tgid,
+                       fees_arr, slips_arr, funds_arr, gross_arr, nets_arr))
 
     return trades, metrics_tuple, eq_frac, rets, None
 
@@ -1586,6 +1829,8 @@ def backtest(df, raw_sig, carry_in=None):
         0.0 if FOREX_MODE else FUNDING_FEE/100,
         1.0 if FOREX_MODE else RISK_AMOUNT,
         ACCOUNT_SIZE,
+        MAX_HOLD_BARS,                                  # item #46
+        CLAMP_RESULTS,                                  # crypto R-clamp toggle
         carry_side_num, carry_ent, carry_price
     )
 
@@ -1951,7 +2196,10 @@ def export_trades(trades, df, strat, window, sample, path, write_header):
     t, o, h, l, c = (df[x].values for x in ('time','open','high','low','close'))
     rows = []
     for trade in trades:
-        side, ei, xi, _entry_price, _exit_price, _qty, pnl = trade
+        # Item #2: trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
+        # *_ swallows the trailing leg metadata; the CSV schema stays at
+        # 15 columns so parity_ledger.py keeps working unchanged.
+        side, ei, xi, _entry_price, _exit_price, _qty, pnl, *_ = trade
         rows.append([
             strat,
             window,
@@ -2614,7 +2862,9 @@ def _classic_single_run_impl(df):
             trades_all = tr_is_opt + tr_oos_opt
 
             # 3.b) extract pnl from each trade tuple
-            pnl_list = [trade[-1] for trade in trades_all]  # last element is pnl
+            # Item #2: pnl is at index 6; the 9-tuple's last element is
+            # tgid (row index), so trade[-1] would break the cumsum.
+            pnl_list = [trade[6] for trade in trades_all]
 
             # 3.c) cumulative-sum into an equity curve
             if FOREX_MODE:
@@ -2801,7 +3051,31 @@ def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] =
 
 
 def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
-    # Build robustness scenarios using the queued flags
+    """Walk-forward driver. Item #5 turned this into a thin dispatcher;
+    the regime / no-regime path bodies live in
+    ``_walk_forward_regime_path`` and ``_walk_forward_default_path``,
+    both registered in ``backtester.orchestrator`` under their
+    ``RouteKey`` flags.
+
+    The shared robustness-scenario setup remains here so registered
+    routes receive a fully-baked ``rb_scenarios`` list rather than
+    re-deriving it (which would re-read globals and risk drift).
+    """
+    rb_scenarios = _build_rb_scenarios()
+    key = orchestrator.RouteKey(
+        regime=(USE_WFO and USE_REGIME_SEG),
+        multi_asset=False,
+        multi_leg=False,
+        record_costs=False,
+        hold_period_set=False,
+    )
+    return orchestrator.dispatch(key)(df, met_is_baseline, eq_is_baseline, rb_scenarios)
+
+
+def _build_rb_scenarios():
+    """Extracted from the pre-#5 _walk_forward_impl body verbatim so
+    every registered route consumes an identical rb_scenarios list.
+    Reads the same module-level globals the inline version did."""
     if ROBUSTNESS_SCENARIOS:
         items = list(ROBUSTNESS_SCENARIOS.items())[:MAX_ROBUSTNESS_SCENARIOS]
     else:
@@ -2820,12 +3094,17 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
             continue
         label = _label_from_flags(flags)
         rb_scenarios.append((label, opts))
+    return rb_scenarios
 
+
+def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
+    """Regime + WFO path. Extracted from _walk_forward_impl in item #5;
+    body unchanged from the pre-refactor branch at v0.4.0+#3."""
     # ===== 1.  WFO **with** regime segmentation ============================
     # Rewritten in v0.2.0: WFO walks the standard cadence (candles or trades).
     # Regime segmentation only changes which per-regime LB is active for each
     # OOS bar; the WFO test/train boundaries are NOT shifted by regime changes.
-    if USE_WFO and USE_REGIME_SEG:
+    if True:  # preserved for diff-minimisation against pre-#5 source
         n           = len(df)
         start_total = n - OOS_CANDLES
         cur_start   = start_total
@@ -2935,6 +3214,10 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
         split_wfo_is = len(eq_seed) - 1
         return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
 
+
+def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
+    """No-regime path. Extracted from _walk_forward_impl in item #5;
+    body unchanged from the pre-refactor branch."""
     # ===== 2.  WFO **without** regime segmentation =========================
     n           = len(df)
     start_total = n - OOS_CANDLES
@@ -3010,6 +3293,21 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
 
     split_wfo_is = len(eq_seed) - 1
     return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
+
+
+# Register Phase 1 single-asset orchestrator routes (item #5). Each entry
+# wraps one of the two original _walk_forward_impl branches verbatim;
+# adding new entries (multi_asset=True, multi_leg=True, ...) is the
+# extension point for Phases 2-5.
+orchestrator.register(
+    orchestrator.RouteKey(regime=True),
+    _walk_forward_regime_path,
+)
+orchestrator.register(
+    orchestrator.RouteKey(regime=False),
+    _walk_forward_default_path,
+)
+
 
 def inject_news_candles(df: pd.DataFrame, seed: int | None = None) -> pd.DataFrame:
     """Return **new** DataFrame where every 5001000 bars a burst of 12 candles
