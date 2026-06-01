@@ -51,6 +51,14 @@ OOS_CANDLES         = 90_000                    # length of RAW-OOS
 USE_OOS2            = False                     # if True, split OOS into two windows
 
 OPT_METRIC          = "Sharpe"              # ROI, PF, Sharpe, WinRate, Exp, MaxDrawdown, Consistency
+# How the reported (and, since OPT_METRIC may be "Sharpe", optimised) Sharpe is
+# computed. "trade" (default, unchanged) = the per-trade statistic
+# mean(trade returns)/std * sqrt(trade count) -- a t-statistic of the mean
+# trade return, robust for sparse-trade event strategies. "bar" = the standard
+# calendar-time Sharpe on the per-bar mark-to-market equity curve, annualised by
+# the bar frequency (matches the convention used by vectorbt / empyrical). The
+# two are different statistics by design; see the paper's Sharpe-convention note.
+SHARPE_MODE         = "trade"               # "trade" | "bar"
 MIN_TRADES          = 10
 SMART_OPTIMIZATION  = True    # True to skip spiky optimisations
 DRAWDOWN_CONSTRAINT = None    # Skip optimizations with a drawdown higher than the value input. Use "None" for OFF
@@ -1562,6 +1570,63 @@ def _backtest_numba_core(o, h, l, c, sig,
     return trades, metrics_tuple, eq_frac, rets, None
 
 
+def _bar_based_sharpe(df, trades, use_forex, account_size):
+    """Standard calendar-time Sharpe on the per-bar mark-to-market equity curve.
+
+    Reconstructs equity at every bar as account + realised PnL of closed trades
+    + unrealised mark-to-market of any open position at that bar's close, then
+    annualises mean/std of per-bar returns by the bar frequency (periods per
+    Julian year from the median bar spacing). Crypto path compounds (pct-change
+    returns, matching vectorbt/empyrical); forex path is in R-units and uses
+    additive increments. The Rust port reconstructs this identically (parity).
+    """
+    n = len(df)
+    if n < 3 or not trades:
+        return 0.0
+    close = df["close"].to_numpy(dtype=float)
+    realized = np.zeros(n)
+    unreal = np.zeros(n)
+    if use_forex:
+        sl_dist = SL_PERCENTAGE * PIP_SIZE
+        rrr = (TP_PERCENTAGE / SL_PERCENTAGE) if SL_PERCENTAGE else 1.0
+    for side, ent, exi, ep, xp, qty, pnl in trades:
+        e, x = int(ent), int(exi)
+        if x < e:
+            continue
+        if x < n:
+            realized[x:] += pnl
+        d = 1.0 if side == 1 else -1.0
+        for i in range(e, min(x, n)):
+            if use_forex:
+                r = (d * (close[i] - ep) / sl_dist) if sl_dist else 0.0
+                unreal[i] = min(max(r, -1.0), rrr) * POSITION_SIZE
+            else:
+                unreal[i] = d * qty * (close[i] - ep)
+    if use_forex:
+        bar_eq = realized + unreal               # R-units around 0
+        ret = np.diff(bar_eq)                     # additive R increments
+    else:
+        bar_eq = account_size + realized + unreal
+        ret = np.diff(bar_eq) / bar_eq[:-1]       # compounding (pct-change)
+    ret = ret[np.isfinite(ret)]
+    if ret.size < 2 or ret.std() <= 0:
+        return 0.0
+    # periods per Julian year from the median bar spacing (seconds). The bar
+    # timestamps may live in the index or a `time` column, as (tz-aware)
+    # datetime or unix; `.asi8` gives UTC nanoseconds in all cases.
+    ts = None
+    if isinstance(df.index, pd.DatetimeIndex):
+        ts = df.index
+    elif "time" in df.columns:
+        col = df["time"]
+        ts = pd.DatetimeIndex(col) if pd.api.types.is_datetime64_any_dtype(col) \
+             else pd.to_datetime(col.to_numpy(), unit="s", utc=True)
+    sec = float(np.median(np.diff(np.asarray(ts.asi8))) / 1e9) \
+          if ts is not None and len(ts) > 1 else 0.0
+    ppy = (31_557_600.0 / sec) if sec > 0 else 1.0
+    return float(ret.mean() / ret.std() * np.sqrt(ppy))
+
+
 # User-facing wrapper (keeps backward-compatible signature).
 def backtest(df, raw_sig, carry_in=None):
     # Build normalized signal inputs and route them to the Numba core.
@@ -1595,6 +1660,10 @@ def backtest(df, raw_sig, carry_in=None):
         Exp=float(expc), Sharpe=float(shp), MaxDrawdown=float(dd),
         Consistency=float(cons)
     )
+    # Standard (bar-based) Sharpe override. Default SHARPE_MODE="trade" leaves
+    # the per-trade statistic untouched (bit-identical to prior releases).
+    if SHARPE_MODE == "bar":
+        metrics["Sharpe"] = _bar_based_sharpe(df, trades, FOREX_MODE, ACCOUNT_SIZE)
 
     return trades, metrics, eq_frac, rets, None
 
