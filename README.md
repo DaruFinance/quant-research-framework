@@ -4,7 +4,7 @@
 [![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798594.svg)](https://doi.org/10.5281/zenodo.19798594)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
 
 Research-grade Python framework for evaluating systematic trading strategies using walk-forward optimization, statistical validation, and robustness testing.
@@ -229,7 +229,7 @@ not (verified against primary docs as of 2026-04):
 
 | Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
 |------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
-| **this** (Python + Rust) | MIT                    | ✓            | ✓                          | ✓                         | ✓                                |
+| **this** (Python + Rust) | Apache-2.0                    | ✓            | ✓                          | ✓                         | ✓                                |
 | [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |
 | [backtrader][bt]       | GPL-3.0                  | ✗ (community) | ✗                         | ✗                         | n/a                              |
 | [NautilusTrader][nt]   | LGPL-3.0                 | ✗ (engine only) | ✗                       | ✗                         | ✗ (bilingual; no parity asserts) |
