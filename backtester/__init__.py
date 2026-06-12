@@ -127,6 +127,8 @@ WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per w
 # parity_common.LINE_RE matches, so existing parity harnesses stay
 # byte-identical. Env override: QRF_OVERFIT=1 turns it on without code edits.
 OVERFIT_REPORT      = (os.environ.get("QRF_OVERFIT") == "1")
+EMIT_OPT_SURFACE    = os.environ.get("EMIT_OPT_SURFACE", "0") in ("1", "true", "True")
+EMIT_OPT_SURFACE_SL = os.environ.get("EMIT_OPT_SURFACE_SL", "0") in ("1", "true", "True")
 
 
 EXPORT_PATH         = "trade_list.csv"
@@ -299,6 +301,10 @@ class Config:
     # Overfitting-statistics report (item #3); default OFF.
     overfit_report: bool = False
 
+    # ---- item #1 (IS isosurface emit) ----
+    emit_opt_surface: bool = False
+    emit_opt_surface_sl: bool = False
+
     # I/O
     csv_file: str = "data/your_ohlc.csv"
     export_path: str = "trade_list.csv"
@@ -356,6 +362,8 @@ class Config:
         'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
         'wfo_trigger_val': 'WFO_TRIGGER_VAL',
         'overfit_report': 'OVERFIT_REPORT',
+        'emit_opt_surface': 'EMIT_OPT_SURFACE',
+        'emit_opt_surface_sl': 'EMIT_OPT_SURFACE_SL',
         'csv_file': 'CSV_FILE',
         'export_path': 'EXPORT_PATH',
     }
@@ -2628,6 +2636,13 @@ def _classic_single_run_impl(df):
     # ---------- CASE B  classic optimisation (no regime segment) ----------
     best_lb, met_is_opt = optimiser(is_df, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
 
+    # Item #1: emit the baseline IS objective surface (opt-in, default off).
+    if EMIT_OPT_SURFACE:
+        import backtester as _bt
+        from backtester import opt_surface as _osf
+        _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+        _osf.emit_surface_classic(_bt, is_df, "baseline", write_header=_hdr)
+
     if best_lb:
         best_rrr = met_is_opt.get('RRR') if OPTIMIZE_RRR else None
         rrr_note = f"  |  Best RRR = {best_rrr}" if best_rrr is not None else ""
@@ -2988,6 +3003,12 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
             best_lbs, _  = optimize_regimes_sequential(is_df_roll)
             if not best_lbs or all(v is None for v in best_lbs.values()):
                 break
+            if EMIT_OPT_SURFACE:
+                import backtester as _bt
+                from backtester import opt_surface as _osf
+                _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+                _osf.emit_surface_regime(_bt, is_df_roll, best_lbs,
+                                         f"{window_no:02d}", write_header=_hdr)
 
             # --- OOS slice with regime-rotated signals --------------------
             dfo          = df.iloc[cur_start:cur_end].reset_index(drop=True)
@@ -3068,6 +3089,11 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
         lb_roll, _   = optimiser(is_df_roll, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
         if not lb_roll:
             break
+        if EMIT_OPT_SURFACE:
+            import backtester as _bt
+            from backtester import opt_surface as _osf
+            _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+            _osf.emit_surface_classic(_bt, is_df_roll, f"{window_no:02d}", write_header=_hdr)
 
         dfo          = df.iloc[cur_start:cur_end].reset_index(drop=True)
         rets_oos, rb_rets_window, eq_is_window, rb_eq_is_window = _run_wfo_window(
