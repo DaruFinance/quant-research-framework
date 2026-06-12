@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-12
+
+### Added
+- **OHLCV contract + volume** — optional `volume` column in `load_ohlc` (backward-
+  compatible; 5-column files load byte-identically), `backtester/volume_indicators.py`
+  (OBV, VWAP rolling+session, vol SMA/EMA, relative volume, z-score, MFI, A/D), volume
+  strategy examples, cross-engine parity via `tools/parity_volume.py`.
+- **Overfitting-statistics layer** — Probabilistic Sharpe Ratio, Minimum Track-Record
+  Length, Minimum Backtest Length in `backtester/dsr.py`; `backtester/haircut.py`
+  (Harvey-Liu Bonferroni+BHY); opt-in `backtester/overfit_report.py` emitting
+  DSR/PSR/PBO/MinTRL/MinBTL/haircut after the WFO run (gated by `QRF_OVERFIT=1` /
+  `Config.overfit_report`, additive lines that never touch the parity surface).
+- **IS parameter-robustness isosurface** — `backtester/opt_surface.py` emits the dense
+  in-sample objective grid (opt-in via `EMIT_OPT_SURFACE` / `Config.emit_opt_surface`);
+  `tools/render_surface.py` renders it.
+
+### Changed
+- **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
+  and `README.md`.
+- Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). Performance refreshed to
+  a single pass: **32–76× faster, 29–68× less memory** vs this Python reference
+  (reproduce with `tools/bench.py` from the Rust repo).
+
+### Notes
+- All new behaviour is opt-in; the existing parity surfaces remain byte-identical against
+  the Rust port.
+
 ## [0.4.0] — 2026-05-03
 
 ### Added

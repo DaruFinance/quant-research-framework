@@ -4,7 +4,7 @@
 [![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798594.svg)](https://doi.org/10.5281/zenodo.19798594)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
 
 Research-grade Python framework for evaluating systematic trading strategies using walk-forward optimization, statistical validation, and robustness testing.
@@ -168,7 +168,7 @@ Optional scenarios such as:
 The framework follows [Semantic Versioning](https://semver.org/). See
 [`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
 `version` field in [`pyproject.toml`](pyproject.toml) is the source of
-truth (currently `0.4.0`).
+truth (currently `0.6.0`).
 
 ---
 
@@ -203,20 +203,22 @@ independent surfaces:
 - **Forex mode (56/56 metric points on EURUSD 1h)** — verified by
   [`tools/parity_forex.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_forex.py).
 
-Total: 210 / 210 metric points across 30 stages. Maximum observed
-relative deviation is below `5e-5` (the metric ledger's `%.4f`
-print precision floor), 20× tighter than the declared `1e-3` tolerance.
-We avoid the term *byte-identical* throughout: parity is
-tolerance-bounded by construction, not bit-equality.
+These three are the original parity surfaces; v0.6.0 adds more (volume, shared
+indicators, IS-surface, overfitting statistics). Maximum observed relative
+deviation on the default surfaces is below `5e-5` (the metric ledger's `%.4f`
+print precision floor), 20× tighter than the declared `1e-3` tolerance. We
+avoid the term *byte-identical* throughout: parity is tolerance-bounded by
+construction, not bit-equality, and is enforced continuously by the
+`parity_*.py` suite in CI.
 
-It runs **25–60× faster** and uses **~37× less memory**:
+It runs **32–76× faster** (Python reference vs Rust port) and uses **29–68× less memory**:
 
 | Bars   | Python (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
 |-------:|-----------:|---------:|---------:|----------------:|--------------:|
-| 15,000 |       3.03 |     0.05 |   60.60× |             273 |             4 |
-| 25,000 |       3.75 |     0.10 |   37.50× |             277 |             6 |
-| 35,000 |       4.60 |     0.14 |   32.86× |             282 |             7 |
-| 48,000 |       5.78 |     0.23 |   25.13× |             294 |             8 |
+| 15,000 |       3.78 |     0.05 |   75.60× |             273 |             4 |
+| 25,000 |       4.53 |     0.11 |   41.18× |             279 |             6 |
+| 35,000 |       6.17 |     0.16 |   38.56× |             280 |             8 |
+| 48,000 |       7.92 |     0.25 |   31.68× |             291 |            10 |
 
 (Min wall-clock and max peak RSS over 3 warm runs on the bundled
 `SOLUSDT_1h.csv`. Reproduce with `python tools/bench.py` from the
@@ -229,7 +231,7 @@ not (verified against primary docs as of 2026-04):
 
 | Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
 |------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
-| **this** (Python + Rust) | MIT                    | ✓            | ✓                          | ✓                         | ✓                                |
+| **this** (Python + Rust) | Apache-2.0             | ✓            | ✓                          | ✓                         | ✓                                |
 | [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |
 | [backtrader][bt]       | GPL-3.0                  | ✗ (community) | ✗                         | ✗                         | n/a                              |
 | [NautilusTrader][nt]   | LGPL-3.0                 | ✗ (engine only) | ✗                       | ✗                         | ✗ (bilingual; no parity asserts) |
@@ -240,8 +242,8 @@ not (verified against primary docs as of 2026-04):
 The **combination** is the contribution: WFO + per-regime LB + strict
 no-look-ahead enforced by ledger-level invariant tests + a Python
 reference and Rust port whose metric outputs agree within $10^{-3}$
-relative tolerance on three deterministic surfaces (210 / 210 metric
-points across 30 stages). Each cell individually exists somewhere; no
+relative tolerance on every validated surface, enforced continuously by the
+`parity_*.py` harness suite in CI. Each cell individually exists somewhere; no
 other framework ships the whole bundle.
 
 [vbt]: https://github.com/polakowo/vectorbt
