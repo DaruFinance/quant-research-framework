@@ -75,6 +75,10 @@ python backtester.py
 # ATR-cross with RSI confluence — this folder
 python examples/atr_cross/atr_cross.py
 
+# Minimal end-to-end: custom strategy -> IS/OOS -> WFO -> overfitting report
+# (DSR / PSR / MinTRL / MinBTL). Runs the full pipeline on real data in ~7s.
+python examples/end_to_end/end_to_end.py
+
 # Point either one at a different CSV without editing sources
 python examples/atr_cross/atr_cross.py path/to/ohlc.csv
 BT_CSV=path/to/ohlc.csv python backtester.py
