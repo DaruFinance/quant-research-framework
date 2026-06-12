@@ -121,6 +121,13 @@ USE_WFO             = True                       # do rolling windows?
 WFO_TRIGGER_MODE    = "candles"                   # "candles" or "trades"
 WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per window
 
+# Overfitting-statistics report (item #3). OFF by default: when on, an
+# ADDITIVE block (DSR/PSR/PBO/MinTRL/MinBTL/haircut) is printed after the
+# walk-forward run. The block's lines never carry the metric body
+# parity_common.LINE_RE matches, so existing parity harnesses stay
+# byte-identical. Env override: QRF_OVERFIT=1 turns it on without code edits.
+OVERFIT_REPORT      = (os.environ.get("QRF_OVERFIT") == "1")
+
 
 EXPORT_PATH         = "trade_list.csv"
 METRICS             = ["ROI","PF","Sharpe","WinRate","Exp","MaxDrawdown"]
@@ -289,6 +296,9 @@ class Config:
     wfo_trigger_mode: str = "candles"
     wfo_trigger_val: int = 5000
 
+    # Overfitting-statistics report (item #3); default OFF.
+    overfit_report: bool = False
+
     # I/O
     csv_file: str = "data/your_ohlc.csv"
     export_path: str = "trade_list.csv"
@@ -345,6 +355,7 @@ class Config:
         'use_wfo': 'USE_WFO',
         'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
         'wfo_trigger_val': 'WFO_TRIGGER_VAL',
+        'overfit_report': 'OVERFIT_REPORT',
         'csv_file': 'CSV_FILE',
         'export_path': 'EXPORT_PATH',
     }
@@ -1835,6 +1846,18 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
                 if lb_cand != best_lb:
                     print(f"Smart Optimization: switched from LB {best_lb} to LB {lb_cand} because PF spike exceeded 10% vs neighbors.")
                 break
+
+    # --- item #3 opt-in side-channel: capture the distinct trial Sharpes ---
+    # eval_cache maps each EVALUATED lookback -> (val, lb, met). The set of
+    # distinct lookbacks IS the "strategies tried" set for this single IS
+    # optimisation — window-count-free (effective-trials discipline). Pure
+    # write to the scratch dict; no return value, printed line, or
+    # control-flow change. Gated so default runs are inert.
+    if OVERFIT_REPORT:
+        _runtime_state['_last_trial_sharpes'] = [
+            float(v[2]['Sharpe']) for v in eval_cache.values()
+            if v is not None and 'Sharpe' in v[2]
+        ]
 
     return selected[1], selected[2]
 
@@ -3470,9 +3493,22 @@ def _main_impl():
 
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
 
+    # item #3: clear any stale side-channel from a prior main() call in the
+    # same process. On the regime-no-WFO path optimiser() is never called,
+    # so without this the report could surface a phantom trial vector from
+    # an unrelated earlier run (Lens A3). An empty capture then honestly
+    # reports N=0 instead of stale-N.
+    if OVERFIT_REPORT:
+        _runtime_state.pop('_last_trial_sharpes', None)
+
     # 1) baseline run
     base = classic_single_run(df)
-    signals_cache['df'] = df.copy() 
+    # item #3: snapshot the baseline IS optimisation's distinct trial
+    # Sharpes NOW, before the WFO loop's per-window optimiser() calls
+    # overwrite the side-channel. Canonical "strategies tried" set.
+    _overfit_trials = list(_runtime_state.get('_last_trial_sharpes', [])) \
+        if OVERFIT_REPORT else []
+    signals_cache['df'] = df.copy()
 
     # 1.a) print baseline metrics
     print(" Baseline Optimized Metrics ")
@@ -3505,6 +3541,19 @@ def _main_impl():
     if USE_WFO:
         print(" Running Walk-Forward Windows ")
         oos_rets, eq_wfo, rb_eq_wfo, split_wfo_is = walk_forward(df, base['met_is'], base['eq_is'])
+        # item #3: opt-in overfitting diagnostics. Additive lines only; none
+        # carry the LINE_RE metric body, so parity harnesses are unaffected.
+        # trial count = distinct baseline strategies (NOT windows*combos). The
+        # chosen Sharpe is recomputed FROM oos_rets inside emit() in the
+        # Bailey-LdP sqrt(T)*mean/std convention (NOT met_is).
+        if OVERFIT_REPORT:
+            from backtester import overfit_report
+            overfit_report.emit(
+                trial_sharpes=_overfit_trials,
+                oos_returns=oos_rets,
+                sharpe_mode=SHARPE_MODE,
+                equity_matrix=_runtime_state.get('_overfit_equity_matrix'),
+            )
         # Plot baseline and WFO + robustness
         if PRINT_EQUITY_CURVE:
             plt.figure(figsize=(10,5))
