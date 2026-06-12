@@ -7,13 +7,62 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
 
-Research-grade Python framework for evaluating systematic trading strategies using walk-forward optimization, statistical validation, and robustness testing.
+**The readable reference half of a dual-engine walk-forward backtester.** Strict no-look-ahead, walk-forward optimization (WFO), robustness stress tests, realism controls (fees, slippage, funding, SL/TP), Monte Carlo diagnostics, and overfitting statistics (DSR/PSR/MinTRL/MinBTL, PBO/CSCV). A [Rust port](https://github.com/DaruFinance/quant-research-framework-rs) reproduces this engine's metrics to within `1e-3`, checked in CI on every push.
 
-A research-oriented Python backtesting framework for systematic strategies with **strict no look-ahead rules**, **walk-forward optimization (WFO)**, **robustness stress tests**, and optional **Monte Carlo diagnostics**.
+It answers one question: *does an apparent edge survive out-of-sample evaluation under realistic frictions, or is it just fitting the past?*
 
-This project is designed to answer one question:
+## Two engines, one spec
 
-> Does an apparent edge survive **out-of-sample** evaluation under realistic frictions (fees, slippage, funding) — or is it just fitting the past?
+This repository is the **Python reference** — the readable specification. A separate **Rust port** re-implements it for speed (32–76× faster, 29–68× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red — the correctness claim is *enforced, not asserted*.
+
+```
+                ┌────────────────────────────────────────────────┐
+                │                same OHLC input                  │
+                │     data/SOLUSDT_1h.csv · EURUSD_1h.csv · …      │
+                └───────────────┬────────────────┬───────────────┘
+                                │                │
+                ┌───────────────▼──────┐  ┌──────▼───────────────┐
+                │  Python reference    │  │      Rust port       │
+                │  backtester/         │  │  (sibling repo, …-rs)│
+                │  (this repo, the spec)│ │   speed: 32–76×      │
+                └───────────────┬──────┘  └──────┬───────────────┘
+                                │ metrics        │ metrics
+                                ▼                ▼
+                ┌────────────────────────────────────────────────┐
+                │              parity oracle  (CI)                │
+                │      tools/parity_*.py  ·  assert |Δ| ≤ 1e-3    │
+                │   default 56/56 · regime+WFO 98/98 · fx 56/56   │
+                └────────────────────────┬───────────────────────┘
+                                         │
+                                 red if the port drifts
+```
+
+## Reproduce it in under 5 minutes
+
+```bash
+pip install -r requirements.txt
+make repro
+```
+
+`make repro` runs the no-look-ahead property suite (Hypothesis, over a generated input space) and the look-ahead leak demo, which plants a strategy that reads 4 bars into the future and shows that exactly those 4 *past* bars move under future pollution while the causal strategy does not:
+
+```
+look-ahead leak demo  —  n=800 bars, pollute future at cut=400
+  causal EMA-cross (shipped)    :   0/400 past bars changed   PASS — no look-ahead
+  forward-peek EMA-cross (H=4)  :   4/400 past bars changed   LEAK CAUGHT
+```
+
+The cross-engine parity surfaces (Python vs Rust — 56/56 · 98/98 · 56/56 metric points at `1e-3`) are driven from the [Rust port repo](https://github.com/DaruFinance/quant-research-framework-rs); run `make parity` there.
+
+## What this is / what it isn't
+
+**It is** a correctness-first WFO backtesting engine with the Python↔Rust equivalence machine-checked: realism controls on by default (fees, slippage, funding, SL/TP with intrabar high/low checks), strict no-look-ahead enforced by ledger-level invariant tests, and overfitting diagnostics (DSR/PSR/MinTRL/MinBTL, PBO/CSCV, deflated multiple-testing haircuts).
+
+**It isn't:**
+- **Not alpha.** The bundled strategies (EMA-cross, ATR-cross, …) are plumbing to exercise the engine, not trade signals. There is no edge here to deploy.
+- **Not live trading.** No broker connectivity, order management, or execution — it evaluates strategies on historical bars.
+- **Tested on crypto, FX, and synthetic GBM only.** SOL/BTC/DOGE-USDT, EUR/USD, USD/JPY, and a GBM generator. Equities, futures, and options are untried.
+- **Parity-gated on the core surfaces only.** The stationary-bootstrap module (`backtester/bootstrap.py`) and the `examples/ml_*` strategies are Python-only — no Rust counterpart, no cross-engine check.
 
 ## Quick Start
 
