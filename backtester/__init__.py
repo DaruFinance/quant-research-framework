@@ -631,7 +631,11 @@ def load_ohlc(path: str) -> pd.DataFrame:
             "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
             "You can generate one with binance_ohlc_downloader.py (see README)."
         )
-    df = pd.read_csv(path, usecols=['time', 'open', 'high', 'low', 'close'])
+    _avail = pd.read_csv(path, nrows=0).columns
+    _cols = ['time', 'open', 'high', 'low', 'close'] + (['volume'] if 'volume' in _avail else [])
+    df = pd.read_csv(path, usecols=_cols)
+    if 'volume' in _cols:
+        df['volume'] = df['volume'].fillna(0.0)
     # 1) Parse UNIX seconds as UTC timestamps
     # 2) Convert them into America/New_York (handles DST automatically)
     df['time'] = (
