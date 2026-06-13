@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/render_surface.py` renders it.
 
 ### Changed
+- **Engine split into modules mirroring the Rust port.** `backtester/__init__.py`
+  (3649 → 1629 lines) split into `backtester/metrics.py`, `objectives.py`, and
+  `orchestrator.py` — the same boundaries as Rust's `src/{metrics,objectives,orchestrator}.rs`.
+  Pure move/re-export: the public surface (`backtester.<name>`) is unchanged and every
+  parity surface stays byte-identical (moved code reads live module globals via
+  `import backtester as _bt` so `Config.with_config()`'s runtime mutation contract holds).
 - **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
   and `README.md`.
 - Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). One canonical performance
