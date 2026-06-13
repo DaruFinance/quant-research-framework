@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: DaruFinance/quant-research-framework-rs
-          ref: feat/v0.6.0   # release coordination — revert to `main` when v0.6.0 merges
+          ref: main
           path: quant-research-framework-rs
 
       - name: Set up Python 3.10
