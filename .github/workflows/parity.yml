@@ -11,10 +11,8 @@
 name: parity
 
 on:
-  push:
-    branches: [main]
+  push:                 # every branch — correctness is gated on every push, not just main
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
