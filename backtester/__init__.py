@@ -1858,7 +1858,7 @@ def _bar_based_sharpe(df, trades, use_forex, account_size):
     if use_forex:
         sl_dist = SL_PERCENTAGE * PIP_SIZE
         rrr = (TP_PERCENTAGE / SL_PERCENTAGE) if SL_PERCENTAGE else 1.0
-    for side, ent, exi, ep, xp, qty, pnl in trades:
+    for side, ent, exi, ep, xp, qty, pnl, *_ in trades:   # trades carry extra cost/panel fields; bar-Sharpe uses the first 7
         e, x = int(ent), int(exi)
         if x < e:
             continue
