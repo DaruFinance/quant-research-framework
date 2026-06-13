@@ -22,12 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/render_surface.py` renders it.
 
 ### Changed
-- **Engine split into modules mirroring the Rust port.** `backtester/__init__.py`
-  (3649 → 1629 lines) split into `backtester/metrics.py`, `objectives.py`, and
-  `orchestrator.py` — the same boundaries as Rust's `src/{metrics,objectives,orchestrator}.rs`.
-  Pure move/re-export: the public surface (`backtester.<name>`) is unchanged and every
-  parity surface stays byte-identical (moved code reads live module globals via
-  `import backtester as _bt` so `Config.with_config()`'s runtime mutation contract holds).
+- **Rebased onto the v0.5.0 multi-asset substrate.** This release layers the v0.6.0
+  features (above) on top of the canonical `main`, which already carries the
+  `backtester/{panel,pairs,carry}` multi-asset core, Sortino + multi-term IS objective,
+  the additive `backtester/{metrics,objectives,orchestrator}.py` modules (sortino /
+  composite optimiser scoring / RouteKey dispatch table), and pandas-3.x / Py-3.11+
+  compatibility fixes. `backtester/__init__.py` stays the monolithic engine; the v0.6.0
+  hooks (`OVERFIT_REPORT`, `EMIT_OPT_SURFACE`, the optional OHLCV `volume` column) are
+  gated OFF by default, so every existing parity surface stays byte-identical.
 - **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
   and `README.md`.
 - Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). One canonical performance

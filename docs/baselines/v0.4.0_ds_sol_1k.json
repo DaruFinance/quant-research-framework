@@ -1,0 +1,505 @@
+{
+  "fixture": "tests/fixtures/sol_1h_30000_31000.csv",
+  "bars": 1000,
+  "config": {
+    "BACKTEST_CANDLES": 300,
+    "OOS_CANDLES": 600,
+    "ORIGINAL_OOS": 600,
+    "WFO_TRIGGER_VAL": 150,
+    "WFO_TRIGGER_MODE": "candles",
+    "DEFAULT_LB": 20,
+    "USE_MONTE_CARLO": false,
+    "USE_WFO": true,
+    "strategy": "bundled default (create_raw_signals: EMA(20) vs EMA(lb) cross)",
+    "note": "Defaults (IS=10K/OOS=90K/WFO=5K) do not fit a 1000-bar slice; values above are the smallest that produce meaningful trade activity while still exercising WFO. Item #2 verification uses the same config."
+  },
+  "metrics_by_tag": {
+    "IS-raw": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "OOS-raw": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "IS-opt": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "OOS-opt": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "Baseline IS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "Baseline OOS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "ENT IS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "ENT OOS1": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "FEE IS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "FEE OOS1": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "SLI IS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "SLI OOS1": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "ENT+IND IS": {
+      "trades": 6,
+      "roi": -101.7,
+      "pf": 0.12,
+      "sharpe": -2.7,
+      "win_rate": 0.16670000000000001,
+      "exp": -16.87,
+      "max_dd": 101.7
+    },
+    "ENT+IND OOS1": {
+      "trades": 19,
+      "roi": -183.91,
+      "pf": 0.5,
+      "sharpe": -1.41,
+      "win_rate": 0.31579999999999997,
+      "exp": -9.57,
+      "max_dd": 230.6
+    },
+    "W01 IS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 OOS": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 IS+ENT": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 OOS+ENT": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 IS+FEE": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 OOS+FEE": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 IS+SLI": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 OOS+SLI": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W01 IS+ENT+IND": {
+      "trades": 6,
+      "roi": -101.7,
+      "pf": 0.12,
+      "sharpe": -2.7,
+      "win_rate": 0.16670000000000001,
+      "exp": -16.87,
+      "max_dd": 101.7
+    },
+    "W01 OOS+ENT+IND": {
+      "trades": 6,
+      "roi": -20.7,
+      "pf": 0.81,
+      "sharpe": -0.23,
+      "win_rate": 0.3333,
+      "exp": -3.45,
+      "max_dd": 80.23
+    },
+    "W02 IS": {
+      "trades": 11,
+      "roi": 68.05,
+      "pf": 1.43,
+      "sharpe": 0.57,
+      "win_rate": 0.4545,
+      "exp": 6.35,
+      "max_dd": 108.34
+    },
+    "W02 OOS": {
+      "trades": 6,
+      "roi": 96.07,
+      "pf": 2.21,
+      "sharpe": 0.91,
+      "win_rate": 0.5,
+      "exp": 16.22,
+      "max_dd": 53.92
+    },
+    "W02 IS+ENT": {
+      "trades": 11,
+      "roi": 169.61,
+      "pf": 2.27,
+      "sharpe": 1.27,
+      "win_rate": 0.5455,
+      "exp": 15.56,
+      "max_dd": 107.72
+    },
+    "W02 OOS+ENT": {
+      "trades": 6,
+      "roi": 165.33,
+      "pf": 4.1,
+      "sharpe": 1.65,
+      "win_rate": 0.6667000000000001,
+      "exp": 27.81,
+      "max_dd": 53.88
+    },
+    "W02 IS+FEE": {
+      "trades": 11,
+      "roi": 57.04,
+      "pf": 1.35,
+      "sharpe": 0.48,
+      "win_rate": 0.4545,
+      "exp": 5.35,
+      "max_dd": 112.34
+    },
+    "W02 OOS+FEE": {
+      "trades": 6,
+      "roi": 90.06,
+      "pf": 2.09,
+      "sharpe": 0.85,
+      "win_rate": 0.5,
+      "exp": 15.22,
+      "max_dd": 55.91
+    },
+    "W02 IS+SLI": {
+      "trades": 11,
+      "roi": 44.0,
+      "pf": 1.27,
+      "sharpe": 0.38,
+      "win_rate": 0.4545,
+      "exp": 4.16,
+      "max_dd": 114.35
+    },
+    "W02 OOS+SLI": {
+      "trades": 6,
+      "roi": 84.02,
+      "pf": 2.0,
+      "sharpe": 0.81,
+      "win_rate": 0.5,
+      "exp": 14.21,
+      "max_dd": 56.92
+    },
+    "W02 IS+ENT+IND": {
+      "trades": 11,
+      "roi": 169.11,
+      "pf": 2.27,
+      "sharpe": 1.26,
+      "win_rate": 0.5455,
+      "exp": 15.53,
+      "max_dd": 108.22
+    },
+    "W02 OOS+ENT+IND": {
+      "trades": 6,
+      "roi": 165.33,
+      "pf": 4.1,
+      "sharpe": 1.65,
+      "win_rate": 0.6667000000000001,
+      "exp": 27.81,
+      "max_dd": 53.88
+    },
+    "W03 IS": {
+      "trades": 10,
+      "roi": 245.19,
+      "pf": 3.11,
+      "sharpe": 1.62,
+      "win_rate": 0.5,
+      "exp": 24.74,
+      "max_dd": 53.61
+    },
+    "W03 OOS": {
+      "trades": 5,
+      "roi": 89.51,
+      "pf": 2.61,
+      "sharpe": 0.88,
+      "win_rate": 0.4,
+      "exp": 18.0,
+      "max_dd": 53.5
+    },
+    "W03 IS+ENT": {
+      "trades": 10,
+      "roi": 136.78,
+      "pf": 1.91,
+      "sharpe": 0.91,
+      "win_rate": 0.4,
+      "exp": 13.9,
+      "max_dd": 108.29
+    },
+    "W03 OOS+ENT": {
+      "trades": 4,
+      "roi": 92.01,
+      "pf": 2.73,
+      "sharpe": 0.93,
+      "win_rate": 0.5,
+      "exp": 23.13,
+      "max_dd": 53.5
+    },
+    "W03 IS+FEE": {
+      "trades": 10,
+      "roi": 235.21,
+      "pf": 2.94,
+      "sharpe": 1.55,
+      "win_rate": 0.5,
+      "exp": 23.74,
+      "max_dd": 55.61
+    },
+    "W03 OOS+FEE": {
+      "trades": 5,
+      "roi": 84.51,
+      "pf": 2.44,
+      "sharpe": 0.83,
+      "win_rate": 0.4,
+      "exp": 17.0,
+      "max_dd": 55.5
+    },
+    "W03 IS+SLI": {
+      "trades": 10,
+      "roi": 129.36,
+      "pf": 1.85,
+      "sharpe": 0.87,
+      "win_rate": 0.4,
+      "exp": 13.14,
+      "max_dd": 56.67
+    },
+    "W03 OOS+SLI": {
+      "trades": 5,
+      "roi": -19.12,
+      "pf": 0.79,
+      "sharpe": -0.22,
+      "win_rate": 0.2,
+      "exp": -3.77,
+      "max_dd": 56.76
+    },
+    "W03 IS+ENT+IND": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W03 OOS+ENT+IND": {
+      "trades": 0,
+      "roi": 0.0,
+      "pf": null,
+      "sharpe": 0.0,
+      "win_rate": 0.0,
+      "exp": 0.0,
+      "max_dd": 0.0
+    },
+    "W04 IS": {
+      "trades": 11,
+      "roi": 9.07,
+      "pf": 1.06,
+      "sharpe": 0.08,
+      "win_rate": 0.3636,
+      "exp": 0.98,
+      "max_dd": 140.79
+    },
+    "W04 OOS": {
+      "trades": 7,
+      "roi": 37.46,
+      "pf": 1.35,
+      "sharpe": 0.37,
+      "win_rate": 0.4286,
+      "exp": 5.39,
+      "max_dd": 53.95
+    },
+    "W04 IS+ENT": {
+      "trades": 11,
+      "roi": 63.24,
+      "pf": 1.4,
+      "sharpe": 0.49,
+      "win_rate": 0.4545,
+      "exp": 5.93,
+      "max_dd": 155.75
+    },
+    "W04 OOS+ENT": {
+      "trades": 7,
+      "roi": -111.97,
+      "pf": 0.25,
+      "sharpe": -1.88,
+      "win_rate": 0.2857,
+      "exp": -15.85,
+      "max_dd": 111.72
+    },
+    "W04 IS+FEE": {
+      "trades": 11,
+      "roi": -1.97,
+      "pf": 1.0,
+      "sharpe": -0.0,
+      "win_rate": 0.3636,
+      "exp": -0.02,
+      "max_dd": 147.8
+    },
+    "W04 OOS+FEE": {
+      "trades": 7,
+      "roi": 30.47,
+      "pf": 1.28,
+      "sharpe": 0.3,
+      "win_rate": 0.4286,
+      "exp": 4.39,
+      "max_dd": 55.95
+    },
+    "W04 IS+SLI": {
+      "trades": 11,
+      "roi": -12.04,
+      "pf": 0.95,
+      "sharpe": -0.08,
+      "win_rate": 0.3636,
+      "exp": -0.94,
+      "max_dd": 152.84
+    },
+    "W04 OOS+SLI": {
+      "trades": 7,
+      "roi": 24.0,
+      "pf": 1.21,
+      "sharpe": 0.24,
+      "win_rate": 0.4286,
+      "exp": 3.46,
+      "max_dd": 56.95
+    },
+    "W04 IS+ENT+IND": {
+      "trades": 15,
+      "roi": 58.57,
+      "pf": 1.28,
+      "sharpe": 0.43,
+      "win_rate": 0.4,
+      "exp": 4.04,
+      "max_dd": 160.41
+    },
+    "W04 OOS+ENT+IND": {
+      "trades": 7,
+      "roi": -62.52,
+      "pf": 0.58,
+      "sharpe": -0.63,
+      "win_rate": 0.2857,
+      "exp": -8.82,
+      "max_dd": 81.79
+    }
+  },
+  "tag_count": 54
+}

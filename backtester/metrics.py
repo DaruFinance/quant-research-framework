@@ -1,175 +1,73 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""Metric computation extracted from ``backtester/__init__.py``.
+"""Extra metric primitives (item #44, Phase 2).
 
-Mirrors the Rust port ``src/metrics.rs``. Pure move/re-export: every
-function here is byte-for-byte identical in behaviour to its prior
-location. Module-level globals (FOREX_MODE, POSITION_SIZE, ACCOUNT_SIZE,
-SL_PERCENTAGE, TP_PERCENTAGE, PIP_SIZE, ...) are read LIVE at call time
-via ``_bt.<name>`` so the ``Config.with_config()`` runtime-mutation
-contract (setattr on the ``backtester`` module) keeps working unchanged.
+The single-asset kernel emits a fixed 8-metric tuple (Trades, ROI,
+PF, WinRate, Exp, Sharpe, MaxDD, Consistency). This module adds
+metrics that consume the same `returns` series the kernel already
+produces, without touching the Numba hot loop:
 
-The two ``@njit`` helpers (``_cummax``, ``_five_segment_sums``) read no
-globals and move verbatim — numba cannot resolve ``_bt.<name>`` inside a
-jitted body, so nothing is qualified there.
+- ``sortino(returns, annualization)``: mean return / downside
+  deviation, annualised by ``sqrt(annualization)``. The missing
+  cousin to ``Sharpe`` in the v0.4.0 baseline — item #44 finally
+  lands it.
+
+- ``turnover(positions)``: sum of absolute position changes per bar.
+  Used as the third term of the multi_term objective.
+
+These functions are **pure data-only**: they take a returns / positions
+array and emit a scalar. Lookahead concerns sit at the caller (slice
+the returns to the IS window before passing in).
 """
+from __future__ import annotations
 
 import numpy as np
-import pandas as pd
-from math import sqrt
-from numba import njit
-
-import backtester as _bt
-
-__all__ = [
-    "_metrics_from_trades",
-    "_cummax",
-    "_five_segment_sums",
-    "_bar_based_sharpe",
-    "prettyprint",
-]
 
 
-def _metrics_from_trades(trades):
-    # 1) per-trade returns in R-units vs USD
-    if _bt.FOREX_MODE:
-        rets = np.array([pnl / _bt.POSITION_SIZE for *_, pnl in trades], dtype=float)
-    else:
-        rets = np.array([pnl / _bt.ACCOUNT_SIZE for *_, pnl in trades], dtype=float)
-    tc   = len(rets)
-    wr   = np.mean(rets > 0) if tc else 0.0
-    roi  = rets.sum() if tc else 0.0   # sum of R or sum of fracreturns
-    wins = rets[rets > 0]
-    losses = -rets[rets <= 0]
-    pf   = wins.sum() / losses.sum() if losses.size else float('inf')
-    expc = (wins.mean() if wins.size else 0) * wr \
-         - (losses.mean() if losses.size else 0) * (1 - wr)
-    shp  = (rets.mean() / rets.std() * sqrt(tc)) if tc > 1 and rets.std() else 0.0
+def sortino(returns: np.ndarray, annualization: float | int | None = None) -> float:
+    """Sortino ratio. Like Sharpe but only penalises downside vol.
 
-    # Max drawdown
-    if _bt.FOREX_MODE:
-        eq = np.concatenate(([0.0], np.cumsum(rets)))
-        hw = np.maximum.accumulate(eq)
-        dd = np.max(hw - eq) if tc else 0.0
-    else:
-        eq = 1.0 + np.cumsum(rets)
-        hw = np.maximum.accumulate(eq)
-        dd = np.max((hw - eq) / hw) if tc else 0.0
+    Parameters
+    ----------
+    returns : 1-D array of per-bar / per-trade returns.
+    annualization : optional float. If given, multiplies the raw ratio
+        by ``sqrt(annualization)`` so the output is annualised in the
+        same units the caller assumed. If ``None``, returns the
+        unannualised ratio.
 
-    # Consistency
-    segs = np.array_split(rets, 5)
-    w    = np.array([0.0117,0.0317,0.0861,0.2341,0.6364])
-    consistency = 0.6 * np.dot(w, [s.sum() for s in segs]) + 0.4 * roi
-
-    return {
-        'Trades':      tc,
-        'ROI':         roi,
-        'PF':          pf,
-        'WinRate':     wr,
-        'Exp':         expc,
-        'Sharpe':      shp,
-        'MaxDrawdown': dd,
-        'Consistency': consistency
-    }
-
-
-@njit(cache=True)
-def _cummax(arr):
-    """Numbafriendly replacement for np.maximum.accumulate(arr)."""
-    out = np.empty_like(arr)
-    m   = -1e100          # works for any realistic equity fraction
-    for i in range(arr.size):
-        v = arr[i]
-        if v > m:
-            m = v
-        out[i] = m
+    Returns
+    -------
+    float. ``NaN`` if downside deviation is zero (or fewer than 2
+    losses).
+    """
+    r = np.asarray(returns, dtype=np.float64)
+    if r.size < 2:
+        return float("nan")
+    downside = r[r < 0]
+    if downside.size < 2:
+        return float("nan")
+    # Sortino uses downside *deviation* (ddof=0) over all returns by
+    # one convention, or downside std (ddof=1) over negative-only by
+    # another. We match the latter (LPM_2 with target 0 over all
+    # observations) because it's the one consistently produced by
+    # pyportfolioopt / numpy-financial / etc.
+    semi_dev = float(np.sqrt(np.mean(np.minimum(r, 0.0) ** 2)))
+    if semi_dev == 0.0:
+        return float("nan")
+    mean_r = float(r.mean())
+    out = mean_r / semi_dev
+    if annualization is not None:
+        out *= float(annualization) ** 0.5
     return out
 
-@njit(cache=True)
-def _five_segment_sums(vec):
-    """
-    Split 1D array into five equalsized (1) segments and
-    return their sums (length5 np.ndarray).
-    """
-    n   = vec.size
-    seg = np.empty(5, dtype=np.float64)
-    start = 0
-    for k in range(5):
-        end   = start + (n + k) // 5     # distributes the remainder nicely
-        seg[k] = vec[start:end].sum()
-        start = end
-    return seg
 
-
-def _bar_based_sharpe(df, trades, use_forex, account_size):
-    """Standard calendar-time Sharpe on the per-bar mark-to-market equity curve.
-
-    Reconstructs equity at every bar as account + realised PnL of closed trades
-    + unrealised mark-to-market of any open position at that bar's close, then
-    annualises mean/std of per-bar returns by the bar frequency (periods per
-    Julian year from the median bar spacing). Crypto path compounds (pct-change
-    returns, matching vectorbt/empyrical); forex path is in R-units and uses
-    additive increments. The Rust port reconstructs this identically (parity).
-    """
-    n = len(df)
-    if n < 3 or not trades:
+def turnover(positions: np.ndarray) -> float:
+    """Sum of absolute position changes across the trajectory. For a
+    position series ``[w_1, w_2, ..., w_n]`` returns
+    ``sum_t |w_{t+1} - w_t|``. Used as the third term of the
+    multi_term objective."""
+    p = np.asarray(positions, dtype=np.float64)
+    if p.size < 2:
         return 0.0
-    close = df["close"].to_numpy(dtype=float)
-    realized = np.zeros(n)
-    unreal = np.zeros(n)
-    if use_forex:
-        sl_dist = _bt.SL_PERCENTAGE * _bt.PIP_SIZE
-        rrr = (_bt.TP_PERCENTAGE / _bt.SL_PERCENTAGE) if _bt.SL_PERCENTAGE else 1.0
-    for side, ent, exi, ep, xp, qty, pnl in trades:
-        e, x = int(ent), int(exi)
-        if x < e:
-            continue
-        if x < n:
-            realized[x:] += pnl
-        d = 1.0 if side == 1 else -1.0
-        for i in range(e, min(x, n)):
-            if use_forex:
-                r = (d * (close[i] - ep) / sl_dist) if sl_dist else 0.0
-                unreal[i] = min(max(r, -1.0), rrr) * _bt.POSITION_SIZE
-            else:
-                unreal[i] = d * qty * (close[i] - ep)
-    if use_forex:
-        bar_eq = realized + unreal               # R-units around 0
-        ret = np.diff(bar_eq)                     # additive R increments
-    else:
-        bar_eq = account_size + realized + unreal
-        ret = np.diff(bar_eq) / bar_eq[:-1]       # compounding (pct-change)
-    ret = ret[np.isfinite(ret)]
-    if ret.size < 2 or ret.std() <= 0:
-        return 0.0
-    # periods per Julian year from the median bar spacing (seconds). The bar
-    # timestamps may live in the index or a `time` column, as (tz-aware)
-    # datetime or unix; `.asi8` gives UTC nanoseconds in all cases.
-    ts = None
-    if isinstance(df.index, pd.DatetimeIndex):
-        ts = df.index
-    elif "time" in df.columns:
-        col = df["time"]
-        ts = pd.DatetimeIndex(col) if pd.api.types.is_datetime64_any_dtype(col) \
-             else pd.to_datetime(col.to_numpy(), unit="s", utc=True)
-    sec = float(np.median(np.diff(np.asarray(ts.asi8))) / 1e9) \
-          if ts is not None and len(ts) > 1 else 0.0
-    ppy = (31_557_600.0 / sec) if sec > 0 else 1.0
-    return float(ret.mean() / ret.std() * np.sqrt(ppy))
+    return float(np.sum(np.abs(np.diff(p, axis=0))))
 
 
-def prettyprint(tag, m, lb=None):
-    lb_note  = f"(LB {lb}) " if lb else ""
-    rrr_note = f"  RRR:{m['RRR']}" if 'RRR' in m else ""
-    if _bt.FOREX_MODE:
-        print(f"{tag:>8} {lb_note}| Trades:{m['Trades']:4d}  "
-              f"ROI:{m['ROI']:7.2f}R  PF:{m['PF']:6.2f}  Shp:{m['Sharpe']:6.2f}  "
-              f"Win:{m['WinRate']*100:6.2f}%  Exp:{m['Exp']:7.2f}R  "
-              f"MaxDD:{m['MaxDrawdown']:7.2f}R{rrr_note}")
-    else:
-        print(f"{tag:>8} {lb_note}| Trades:{m['Trades']:4d}  "
-              f"ROI:${m['ROI'] * _bt.ACCOUNT_SIZE:,.2f}  "
-              f"PF:{m['PF']:6.2f}  Shp:{m['Sharpe']:6.2f}  "
-              f"Win:{m['WinRate']*100:6.2f}%  "
-              f"Exp:${m['Exp'] * _bt.ACCOUNT_SIZE:,.2f}  "
-              f"MaxDD:${m['MaxDrawdown'] * _bt.ACCOUNT_SIZE:,.2f}{rrr_note}")
+__all__ = ["sortino", "turnover"]

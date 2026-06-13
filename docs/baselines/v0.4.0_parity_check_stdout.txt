@@ -1,0 +1,78 @@
+Using bundled dataset: /home/daru/quant-research-framework-rs-v2/data/SOLUSDT_1h.csv
+Python repo: /home/daru/quant-research-framework-v2
+Rust  repo: /home/daru/quant-research-framework-rs-v2
+CSV       : /home/daru/quant-research-framework-rs-v2/data/SOLUSDT_1h.csv
+Tolerance : 0.1%
+
+Running Python...
+Running Rust...
+
+Parsed: python=194 tagged lines, rust=196 tagged lines
+
+Comparing baseline IS-raw / OOS-raw:
+  [IS-raw]
+      trades: py=112  rs=112  [OK]
+         roi: py=    535.2400  rs=    535.2400  rel= 0.00%  [OK]
+          pf: py=      1.2600  rs=      1.2600  rel= 0.00%  [OK]
+      sharpe: py=      1.0800  rs=      1.0800  rel= 0.00%  [OK]
+    win_rate: py=      0.3214  rs=      0.3214  rel= 0.00%  [OK]
+         exp: py=      4.8400  rs=      4.8400  rel= 0.00%  [OK]
+      max_dd: py=    230.3600  rs=    230.3600  rel= 0.00%  [OK]
+  [OOS-raw]
+      trades: py=733  rs=733  [OK]
+         roi: py=   2587.7700  rs=   2587.7700  rel= 0.00%  [OK]
+          pf: py=      1.2000  rs=      1.2000  rel= 0.00%  [OK]
+      sharpe: py=      2.1600  rs=      2.1600  rel= 0.00%  [OK]
+    win_rate: py=      0.3083  rs=      0.3083  rel= 0.00%  [OK]
+         exp: py=      3.7000  rs=      3.7000  rel= 0.00%  [OK]
+      max_dd: py=    698.0000  rs=    698.0000  rel= 0.00%  [OK]
+  [IS-opt]
+      trades: py=118  rs=118  [OK]
+         roi: py=   -735.7700  rs=   -735.7700  rel= 0.00%  [OK]
+          pf: py=      0.6100  rs=      0.6100  rel= 0.00%  [OK]
+      sharpe: py=     -2.6900  rs=     -2.6900  rel= 0.00%  [OK]
+    win_rate: py=      0.4153  rs=      0.4153  rel= 0.00%  [OK]
+         exp: py=     -6.2000  rs=     -6.2000  rel= 0.00%  [OK]
+      max_dd: py=    804.8200  rs=    804.8200  rel= 0.00%  [OK]
+  [OOS-opt]
+      trades: py=755  rs=755  [OK]
+         roi: py=  -2077.8500  rs=  -2077.8500  rel= 0.00%  [OK]
+          pf: py=      0.8100  rs=      0.8100  rel= 0.00%  [OK]
+      sharpe: py=     -2.9100  rs=     -2.9100  rel= 0.00%  [OK]
+    win_rate: py=      0.4848  rs=      0.4848  rel= 0.00%  [OK]
+         exp: py=     -2.6800  rs=     -2.6800  rel= 0.00%  [OK]
+      max_dd: py=   2258.9300  rs=   2258.9300  rel= 0.00%  [OK]
+  [Baseline IS]
+      trades: py=118  rs=118  [OK]
+         roi: py=   -735.7700  rs=   -735.7700  rel= 0.00%  [OK]
+          pf: py=      0.6100  rs=      0.6100  rel= 0.00%  [OK]
+      sharpe: py=     -2.6900  rs=     -2.6900  rel= 0.00%  [OK]
+    win_rate: py=      0.4153  rs=      0.4153  rel= 0.00%  [OK]
+         exp: py=     -6.2000  rs=     -6.2000  rel= 0.00%  [OK]
+      max_dd: py=    804.8200  rs=    804.8200  rel= 0.00%  [OK]
+  [Baseline OOS]
+      trades: py=755  rs=755  [OK]
+         roi: py=  -2077.8500  rs=  -2077.8500  rel= 0.00%  [OK]
+          pf: py=      0.8100  rs=      0.8100  rel= 0.00%  [OK]
+      sharpe: py=     -2.9100  rs=     -2.9100  rel= 0.00%  [OK]
+    win_rate: py=      0.4848  rs=      0.4848  rel= 0.00%  [OK]
+         exp: py=     -2.6800  rs=     -2.6800  rel= 0.00%  [OK]
+      max_dd: py=   2258.9300  rs=   2258.9300  rel= 0.00%  [OK]
+  [W01 IS]
+      trades: py=118  rs=118  [OK]
+         roi: py=    308.2500  rs=    308.2500  rel= 0.00%  [OK]
+          pf: py=      1.1400  rs=      1.1400  rel= 0.00%  [OK]
+      sharpe: py=      0.6300  rs=      0.6300  rel= 0.00%  [OK]
+    win_rate: py=      0.2966  rs=      0.2966  rel= 0.00%  [OK]
+         exp: py=      2.6700  rs=      2.6700  rel= 0.00%  [OK]
+      max_dd: py=    448.3500  rs=    448.3500  rel= 0.00%  [OK]
+  [W01 OOS]
+      trades: py=92  rs=92  [OK]
+         roi: py=    899.5700  rs=    899.5700  rel= 0.00%  [OK]
+          pf: py=      1.5700  rs=      1.5700  rel= 0.00%  [OK]
+      sharpe: py=      1.9500  rs=      1.9500  rel= 0.00%  [OK]
+    win_rate: py=      0.3696  rs=      0.3696  rel= 0.00%  [OK]
+         exp: py=      9.8500  rs=      9.8500  rel= 0.00%  [OK]
+      max_dd: py=    243.7700  rs=    243.7700  rel= 0.00%  [OK]
+
+  PARITY OK

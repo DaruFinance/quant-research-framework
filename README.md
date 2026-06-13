@@ -282,7 +282,7 @@ not (verified against primary docs as of 2026-04):
 
 | Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
 |------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
-| **this** (Python + Rust) | Apache-2.0             | ✓            | ✓                          | ✓                         | ✓                                |
+| **this** (Python + Rust) | Apache-2.0                    | ✓            | ✓                          | ✓                         | ✓                                |
 | [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |
 | [backtrader][bt]       | GPL-3.0                  | ✗ (community) | ✗                         | ✗                         | n/a                              |
 | [NautilusTrader][nt]   | LGPL-3.0                 | ✗ (engine only) | ✗                       | ✗                         | ✗ (bilingual; no parity asserts) |

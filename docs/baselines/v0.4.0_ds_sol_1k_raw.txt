@@ -1,0 +1,87 @@
+  IS-raw | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+ OOS-raw | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Replication BEFORE optimisation 
+           ROI:    nan
+            PF:    nan
+        Sharpe:    nan
+       WinRate:    nan
+           Exp:    nan
+   MaxDrawdown:    nan
+No lookback meets drawdown  None, using raw LB 20
+
+Best Sharpe look-back = 20
+
+  IS-opt (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+ OOS-opt (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Replication OOS-opt / IS-opt 
+           ROI:    nan
+            PF:    nan
+        Sharpe:    nan
+       WinRate:    nan
+           Exp:    nan
+   MaxDrawdown:    nan
+ Baseline Optimized Metrics 
+Baseline IS | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+Baseline OOS | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Robustness Test: ENT (Test 1) 
+  ENT IS | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+ENT OOS1 | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Robustness Test: FEE (Test 2) 
+  FEE IS | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+FEE OOS1 | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Robustness Test: SLI (Test 3) 
+  SLI IS | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+SLI OOS1 | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+
+ Robustness Test: ENT+IND (Test 4) 
+ENT+IND IS | Trades:   6  ROI:$-101.70  PF:  0.12  Shp: -2.70  Win: 16.67%  Exp:$-16.87  MaxDD:$101.70
+ENT+IND OOS1 | Trades:  19  ROI:$-183.91  PF:  0.50  Shp: -1.41  Win: 31.58%  Exp:$-9.57  MaxDD:$230.60
+ Running Walk-Forward Windows 
+No lookback meets drawdown  None, using raw LB 20
+  W01 IS (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+ W01 OOS (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 IS+ENT (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 OOS+ENT (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 IS+FEE (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 OOS+FEE (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 IS+SLI (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 OOS+SLI (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W01 IS+ENT+IND (LB 19) | Trades:   6  ROI:$-101.70  PF:  0.12  Shp: -2.70  Win: 16.67%  Exp:$-16.87  MaxDD:$101.70
+W01 OOS+ENT+IND (LB 19) | Trades:   6  ROI:$-20.70  PF:  0.81  Shp: -0.23  Win: 33.33%  Exp:$-3.45  MaxDD:$80.23
+Smart Optimization: switched from LB 12 to LB 13 because PF spike exceeded 10% vs neighbors.
+  W02 IS (LB 13) | Trades:  11  ROI:$68.05  PF:  1.43  Shp:  0.57  Win: 45.45%  Exp:$6.35  MaxDD:$108.34
+ W02 OOS (LB 13) | Trades:   6  ROI:$96.07  PF:  2.21  Shp:  0.91  Win: 50.00%  Exp:$16.22  MaxDD:$53.92
+W02 IS+ENT (LB 13) | Trades:  11  ROI:$169.61  PF:  2.27  Shp:  1.27  Win: 54.55%  Exp:$15.56  MaxDD:$107.72
+W02 OOS+ENT (LB 13) | Trades:   6  ROI:$165.33  PF:  4.10  Shp:  1.65  Win: 66.67%  Exp:$27.81  MaxDD:$53.88
+W02 IS+FEE (LB 13) | Trades:  11  ROI:$57.04  PF:  1.35  Shp:  0.48  Win: 45.45%  Exp:$5.35  MaxDD:$112.34
+W02 OOS+FEE (LB 13) | Trades:   6  ROI:$90.06  PF:  2.09  Shp:  0.85  Win: 50.00%  Exp:$15.22  MaxDD:$55.91
+W02 IS+SLI (LB 13) | Trades:  11  ROI:$44.00  PF:  1.27  Shp:  0.38  Win: 45.45%  Exp:$4.16  MaxDD:$114.35
+W02 OOS+SLI (LB 13) | Trades:   6  ROI:$84.02  PF:  2.00  Shp:  0.81  Win: 50.00%  Exp:$14.21  MaxDD:$56.92
+W02 IS+ENT+IND (LB 12) | Trades:  11  ROI:$169.11  PF:  2.27  Shp:  1.26  Win: 54.55%  Exp:$15.53  MaxDD:$108.22
+W02 OOS+ENT+IND (LB 12) | Trades:   6  ROI:$165.33  PF:  4.10  Shp:  1.65  Win: 66.67%  Exp:$27.81  MaxDD:$53.88
+  W03 IS (LB 21) | Trades:  10  ROI:$245.19  PF:  3.11  Shp:  1.62  Win: 50.00%  Exp:$24.74  MaxDD:$53.61
+ W03 OOS (LB 21) | Trades:   5  ROI:$89.51  PF:  2.61  Shp:  0.88  Win: 40.00%  Exp:$18.00  MaxDD:$53.50
+W03 IS+ENT (LB 21) | Trades:  10  ROI:$136.78  PF:  1.91  Shp:  0.91  Win: 40.00%  Exp:$13.90  MaxDD:$108.29
+W03 OOS+ENT (LB 21) | Trades:   4  ROI:$92.01  PF:  2.73  Shp:  0.93  Win: 50.00%  Exp:$23.13  MaxDD:$53.50
+W03 IS+FEE (LB 21) | Trades:  10  ROI:$235.21  PF:  2.94  Shp:  1.55  Win: 50.00%  Exp:$23.74  MaxDD:$55.61
+W03 OOS+FEE (LB 21) | Trades:   5  ROI:$84.51  PF:  2.44  Shp:  0.83  Win: 40.00%  Exp:$17.00  MaxDD:$55.50
+W03 IS+SLI (LB 21) | Trades:  10  ROI:$129.36  PF:  1.85  Shp:  0.87  Win: 40.00%  Exp:$13.14  MaxDD:$56.67
+W03 OOS+SLI (LB 21) | Trades:   5  ROI:$-19.12  PF:  0.79  Shp: -0.22  Win: 20.00%  Exp:$-3.77  MaxDD:$56.76
+W03 IS+ENT+IND (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+W03 OOS+ENT+IND (LB 20) | Trades:   0  ROI:$0.00  PF:   inf  Shp:  0.00  Win:  0.00%  Exp:$0.00  MaxDD:$0.00
+Smart Optimization: switched from LB 12 to LB 13 because PF spike exceeded 10% vs neighbors.
+  W04 IS (LB 13) | Trades:  11  ROI:$9.07  PF:  1.06  Shp:  0.08  Win: 36.36%  Exp:$0.98  MaxDD:$140.79
+ W04 OOS (LB 13) | Trades:   7  ROI:$37.46  PF:  1.35  Shp:  0.37  Win: 42.86%  Exp:$5.39  MaxDD:$53.95
+W04 IS+ENT (LB 13) | Trades:  11  ROI:$63.24  PF:  1.40  Shp:  0.49  Win: 45.45%  Exp:$5.93  MaxDD:$155.75
+W04 OOS+ENT (LB 13) | Trades:   7  ROI:$-111.97  PF:  0.25  Shp: -1.88  Win: 28.57%  Exp:$-15.85  MaxDD:$111.72
+W04 IS+FEE (LB 13) | Trades:  11  ROI:$-1.97  PF:  1.00  Shp: -0.00  Win: 36.36%  Exp:$-0.02  MaxDD:$147.80
+W04 OOS+FEE (LB 13) | Trades:   7  ROI:$30.47  PF:  1.28  Shp:  0.30  Win: 42.86%  Exp:$4.39  MaxDD:$55.95
+W04 IS+SLI (LB 13) | Trades:  11  ROI:$-12.04  PF:  0.95  Shp: -0.08  Win: 36.36%  Exp:$-0.94  MaxDD:$152.84
+W04 OOS+SLI (LB 13) | Trades:   7  ROI:$24.00  PF:  1.21  Shp:  0.24  Win: 42.86%  Exp:$3.46  MaxDD:$56.95
+W04 IS+ENT+IND (LB 12) | Trades:  15  ROI:$58.57  PF:  1.28  Shp:  0.43  Win: 40.00%  Exp:$4.04  MaxDD:$160.41
+W04 OOS+ENT+IND (LB 12) | Trades:   7  ROI:$-62.52  PF:  0.58  Shp: -0.63  Win: 28.57%  Exp:$-8.82  MaxDD:$81.79
