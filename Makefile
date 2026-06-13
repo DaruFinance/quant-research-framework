@@ -16,7 +16,7 @@ PY := python3
 .PHONY: repro leak invariants test
 
 leak:
-	$(PY) tools/leak_demo.py
+	$(PY) listings/lah_demo.py
 
 invariants:
 	$(PY) -m pytest tests/test_invariants_property.py tests/test_invariants.py -q

@@ -44,12 +44,11 @@ pip install -r requirements.txt
 make repro
 ```
 
-`make repro` runs the no-look-ahead property suite (Hypothesis, over a generated input space) and the look-ahead leak demo, which plants a strategy that reads 4 bars into the future and shows that exactly those 4 *past* bars move under future pollution while the causal strategy does not:
+`make repro` runs the no-look-ahead property suite (Hypothesis, over a generated input space) and the look-ahead leak demo (`listings/lah_demo.py`, the paper's), which replaces every bar after #400 with noise and checks the signals before #400 are unchanged. The causal strategy is untouched; a leaky one peeking 5 bars ahead moves exactly the 4 bars that reach across the boundary:
 
 ```
-look-ahead leak demo  —  n=800 bars, pollute future at cut=400
-  causal EMA-cross (shipped)    :   0/400 past bars changed   PASS — no look-ahead
-  forward-peek EMA-cross (H=4)  :   4/400 past bars changed   LEAK CAUGHT
+[PASS] good (paper Listing 1, .take(idx-1) shift): 0 of 400 bars affected by post-bar-400 pollution.
+[FAIL] buggy (deliberate close.shift(-5) peek): 4 of 400 bars affected by post-bar-400 pollution; first leak at bar 395, last at bar 398.
 ```
 
 The cross-engine parity surfaces (Python vs Rust — 56/56 · 98/98 · 56/56 metric points at `1e-3`) are driven from the [Rust port repo](https://github.com/DaruFinance/quant-research-framework-rs); run `make parity` there.
