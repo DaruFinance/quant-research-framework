@@ -7,3 +7,4 @@ pytz
 requests
 hypothesis
 scikit-learn   # for examples/ml_sklearn/ + examples/ml_regime_kmeans/
+tomli; python_version < "3.11"   # tools/benchmark.py manifest reader (tomllib is 3.11+)

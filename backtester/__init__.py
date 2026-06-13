@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.6.0"
 
 import os, math, random
 import time as pytime
@@ -138,6 +138,15 @@ MAX_ROBUSTNESS_SCENARIOS = 5
 USE_WFO             = True                       # do rolling windows?
 WFO_TRIGGER_MODE    = "candles"                   # "candles" or "trades"
 WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per window
+
+# Overfitting-statistics report (item #3). OFF by default: when on, an
+# ADDITIVE block (DSR/PSR/PBO/MinTRL/MinBTL/haircut) is printed after the
+# walk-forward run. The block's lines never carry the metric body
+# parity_common.LINE_RE matches, so existing parity harnesses stay
+# byte-identical. Env override: QRF_OVERFIT=1 turns it on without code edits.
+OVERFIT_REPORT      = (os.environ.get("QRF_OVERFIT") == "1")
+EMIT_OPT_SURFACE    = os.environ.get("EMIT_OPT_SURFACE", "0") in ("1", "true", "True")
+EMIT_OPT_SURFACE_SL = os.environ.get("EMIT_OPT_SURFACE_SL", "0") in ("1", "true", "True")
 
 
 EXPORT_PATH         = "trade_list.csv"
@@ -312,6 +321,13 @@ class Config:
     wfo_trigger_mode: str = "candles"
     wfo_trigger_val: int = 5000
 
+    # Overfitting-statistics report (item #3); default OFF.
+    overfit_report: bool = False
+
+    # ---- item #1 (IS isosurface emit) ----
+    emit_opt_surface: bool = False
+    emit_opt_surface_sl: bool = False
+
     # I/O
     csv_file: str = "data/your_ohlc.csv"
     export_path: str = "trade_list.csv"
@@ -369,6 +385,9 @@ class Config:
         'use_wfo': 'USE_WFO',
         'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
         'wfo_trigger_val': 'WFO_TRIGGER_VAL',
+        'overfit_report': 'OVERFIT_REPORT',
+        'emit_opt_surface': 'EMIT_OPT_SURFACE',
+        'emit_opt_surface_sl': 'EMIT_OPT_SURFACE_SL',
         'csv_file': 'CSV_FILE',
         'export_path': 'EXPORT_PATH',
     }
@@ -658,7 +677,14 @@ def load_ohlc(path: str) -> pd.DataFrame:
             "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
             "You can generate one with binance_ohlc_downloader.py (see README)."
         )
-    df = pd.read_csv(path, usecols=['time', 'open', 'high', 'low', 'close'])
+    # item #2: optional 6th OHLCV column. Volume is read when present and
+    # NaN-filled to 0.0; absent it is simply not loaded, so existing 5-col
+    # OHLC CSVs and their parity remain byte-identical.
+    _avail = pd.read_csv(path, nrows=0).columns
+    _cols = ['time', 'open', 'high', 'low', 'close'] + (['volume'] if 'volume' in _avail else [])
+    df = pd.read_csv(path, usecols=_cols)
+    if 'volume' in _cols:
+        df['volume'] = df['volume'].fillna(0.0)
     # 1) Parse UNIX seconds as UTC timestamps
     # 2) Convert them into America/New_York (handles DST automatically)
     df['time'] = (
@@ -1832,7 +1858,7 @@ def _bar_based_sharpe(df, trades, use_forex, account_size):
     if use_forex:
         sl_dist = SL_PERCENTAGE * PIP_SIZE
         rrr = (TP_PERCENTAGE / SL_PERCENTAGE) if SL_PERCENTAGE else 1.0
-    for side, ent, exi, ep, xp, qty, pnl in trades:
+    for side, ent, exi, ep, xp, qty, pnl, *_ in trades:   # trades carry extra cost/panel fields; bar-Sharpe uses the first 7
         e, x = int(ent), int(exi)
         if x < e:
             continue
@@ -2076,6 +2102,18 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
                 if lb_cand != best_lb:
                     print(f"Smart Optimization: switched from LB {best_lb} to LB {lb_cand} because PF spike exceeded 10% vs neighbors.")
                 break
+
+    # --- item #3 opt-in side-channel: capture the distinct trial Sharpes ---
+    # eval_cache maps each EVALUATED lookback -> (val, lb, met). The set of
+    # distinct lookbacks IS the "strategies tried" set for this single IS
+    # optimisation — window-count-free (effective-trials discipline). Pure
+    # write to the scratch dict; no return value, printed line, or
+    # control-flow change. Gated so default runs are inert.
+    if OVERFIT_REPORT:
+        _runtime_state['_last_trial_sharpes'] = [
+            float(v[2]['Sharpe']) for v in eval_cache.values()
+            if v is not None and 'Sharpe' in v[2]
+        ]
 
     return selected[1], selected[2]
 
@@ -2849,6 +2887,13 @@ def _classic_single_run_impl(df):
     # ---------- CASE B  classic optimisation (no regime segment) ----------
     best_lb, met_is_opt = optimiser(is_df, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
 
+    # Item #1: emit the baseline IS objective surface (opt-in, default off).
+    if EMIT_OPT_SURFACE:
+        import backtester as _bt2
+        from backtester import opt_surface as _osf
+        _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+        _osf.emit_surface_classic(_bt2, is_df, "baseline", write_header=_hdr)
+
     if best_lb:
         best_rrr = met_is_opt.get('RRR') if OPTIMIZE_RRR else None
         rrr_note = f"  |  Best RRR = {best_rrr}" if best_rrr is not None else ""
@@ -3240,6 +3285,12 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
             best_lbs, _  = optimize_regimes_sequential(is_df_roll)
             if not best_lbs or all(v is None for v in best_lbs.values()):
                 break
+            if EMIT_OPT_SURFACE:
+                import backtester as _bt2
+                from backtester import opt_surface as _osf
+                _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+                _osf.emit_surface_regime(_bt2, is_df_roll, best_lbs,
+                                         f"{window_no:02d}", write_header=_hdr)
 
             # --- OOS slice with regime-rotated signals --------------------
             dfo          = df.iloc[cur_start:cur_end].reset_index(drop=True)
@@ -3324,6 +3375,11 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
         lb_roll, _   = optimiser(is_df_roll, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
         if not lb_roll:
             break
+        if EMIT_OPT_SURFACE:
+            import backtester as _bt2
+            from backtester import opt_surface as _osf
+            _hdr = not os.path.exists(_osf._surface_path(EXPORT_PATH, _osf._resolve_format()))
+            _osf.emit_surface_classic(_bt2, is_df_roll, f"{window_no:02d}", write_header=_hdr)
 
         dfo          = df.iloc[cur_start:cur_end].reset_index(drop=True)
         rets_oos, rb_rets_window, eq_is_window, rb_eq_is_window = _run_wfo_window(
@@ -3764,9 +3820,22 @@ def _main_impl():
 
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
 
+    # item #3: clear any stale side-channel from a prior main() call in the
+    # same process. On the regime-no-WFO path optimiser() is never called,
+    # so without this the report could surface a phantom trial vector from
+    # an unrelated earlier run. An empty capture then honestly reports N=0
+    # instead of stale-N.
+    if OVERFIT_REPORT:
+        _runtime_state.pop('_last_trial_sharpes', None)
+
     # 1) baseline run
     base = classic_single_run(df)
-    signals_cache['df'] = df.copy() 
+    # item #3: snapshot the baseline IS optimisation's distinct trial
+    # Sharpes NOW, before the WFO loop's per-window optimiser() calls
+    # overwrite the side-channel. Canonical "strategies tried" set.
+    _overfit_trials = list(_runtime_state.get('_last_trial_sharpes', [])) \
+        if OVERFIT_REPORT else []
+    signals_cache['df'] = df.copy()
 
     # 1.a) print baseline metrics
     print(" Baseline Optimized Metrics ")
@@ -3799,6 +3868,19 @@ def _main_impl():
     if USE_WFO:
         print(" Running Walk-Forward Windows ")
         oos_rets, eq_wfo, rb_eq_wfo, split_wfo_is = walk_forward(df, base['met_is'], base['eq_is'])
+        # item #3: opt-in overfitting diagnostics. Additive lines only; none
+        # carry the LINE_RE metric body, so parity harnesses are unaffected.
+        # trial count = distinct baseline strategies (NOT windows*combos). The
+        # chosen Sharpe is recomputed FROM oos_rets inside emit() in the
+        # Bailey-LdP sqrt(T)*mean/std convention (NOT met_is).
+        if OVERFIT_REPORT:
+            from backtester import overfit_report
+            overfit_report.emit(
+                trial_sharpes=_overfit_trials,
+                oos_returns=oos_rets,
+                sharpe_mode=SHARPE_MODE,
+                equity_matrix=_runtime_state.get('_overfit_equity_matrix'),
+            )
         # Plot baseline and WFO + robustness
         if PRINT_EQUITY_CURVE:
             plt.figure(figsize=(10,5))

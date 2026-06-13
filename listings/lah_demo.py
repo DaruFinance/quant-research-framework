@@ -6,8 +6,18 @@ internals, lifted to the user-supplied strategy. Replace close[k:] with
 noise; re-run; signals at bars [..k) must match. A leaky strategy diverges.
 """
 import os, sys
-sys.path.insert(0, "/home/daru/quant-research-framework")
-os.environ.setdefault("BT_CSV", "/home/daru/quant-research-framework-rs/data/SOLUSDT_1h.csv")
+
+# Portable repo resolution (matches the paper's reproducibility appendix):
+# QRF_PYTHON_REPO / QRF_RUST_REPO env vars, else sensible fallbacks — the
+# Python repo is this file's grandparent (listings/ sits in the repo root),
+# the Rust repo its sibling. No hardcoded absolute paths.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_PY = (os.environ.get("QRF_PYTHON_REPO") or os.environ.get("QRF_PY_DIR")
+       or os.path.dirname(_HERE))
+_RS = (os.environ.get("QRF_RUST_REPO")
+       or os.path.join(os.path.dirname(_PY), "quant-research-framework-rs"))
+sys.path.insert(0, os.path.abspath(_PY))
+os.environ.setdefault("BT_CSV", os.path.join(_RS, "data", "SOLUSDT_1h.csv"))
 import numpy as np, pandas as pd
 import backtester as bt
 
@@ -51,6 +61,12 @@ def future_pollution_test(strategy_fn, name, k=400):
         first, last = int(diff[0]), int(diff[-1])
         print(f"[FAIL] {name}: {len(diff)} of {k} bars affected by post-bar-{k} "
               f"pollution; first leak at bar {first}, last at bar {last}.")
+    return len(diff)
 
-future_pollution_test(good_strategy,  "good (paper Listing 1, .take(idx-1) shift)")
-future_pollution_test(buggy_strategy, "buggy (deliberate close.shift(-5) peek)")
+_good = future_pollution_test(good_strategy,  "good (paper Listing 1, .take(idx-1) shift)")
+_bad  = future_pollution_test(buggy_strategy, "buggy (deliberate close.shift(-5) peek)")
+
+# The demo is itself a guard: the causal strategy must leak 0 bars and the
+# deliberately-leaky one must be caught (>0). Exit non-zero otherwise so it
+# can gate `make repro` / CI.
+sys.exit(0 if (_good == 0 and _bad > 0) else 1)

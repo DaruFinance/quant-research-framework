@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or design discussion
+    url: https://github.com/DaruFinance/quant-research-framework/discussions
+    about: For usage questions and design discussion, please open a Discussion rather than an issue.
+  - name: Security vulnerability
+    url: https://github.com/DaruFinance/quant-research-framework/blob/main/SECURITY.md
+    about: Report vulnerabilities privately per SECURITY.md — do not file a public issue.
+  - name: Cross-engine parity question
+    url: https://github.com/DaruFinance/quant-research-framework-rs/blob/main/CONTRIBUTING.md
+    about: Parity vs the Rust port is contributor-facing — see the Rust repo's CONTRIBUTING.md for how the harnesses work.

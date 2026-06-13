@@ -1,0 +1,20 @@
+# Fully-pinned lock — the exact environment that produced the published
+# parity surfaces, the frozen benchmark golden, and the paper's numbers.
+# For BIT-REPRODUCTION, install from this file on CPython 3.10:
+#
+#     python3.10 -m venv .venv && . .venv/bin/activate
+#     pip install -r requirements.lock
+#
+# `requirements.txt` is the looser day-to-day list (latest compatible). This
+# lock is the audited pin; bump it deliberately and re-emit the golden if the
+# numbers move. Verified on CPython 3.10, Linux x86-64.
+pandas==2.3.3
+numpy==2.2.6
+scipy==1.15.3
+matplotlib==3.10.9
+numba==0.65.1
+pytz==2026.2
+requests==2.34.2
+hypothesis==6.152.6
+scikit-learn==1.7.2
+tomli==2.4.1 ; python_version < "3.11"   # tools/benchmark.py manifest reader

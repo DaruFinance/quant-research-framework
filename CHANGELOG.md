@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-06-12
+
+### Added
+- **OHLCV contract + volume** — optional `volume` column in `load_ohlc` (backward-
+  compatible; 5-column files load byte-identically), `backtester/volume_indicators.py`
+  (OBV, VWAP rolling+session, vol SMA/EMA, relative volume, z-score, MFI, A/D), volume
+  strategy examples, cross-engine parity via `tools/parity_volume.py`.
+- **Overfitting-statistics layer** — Probabilistic Sharpe Ratio, Minimum Track-Record
+  Length, Minimum Backtest Length in `backtester/dsr.py`; `backtester/haircut.py`
+  (Harvey-Liu Bonferroni+BHY); opt-in `backtester/overfit_report.py` emitting
+  DSR/PSR/PBO/MinTRL/MinBTL/haircut after the WFO run (gated by `QRF_OVERFIT=1` /
+  `Config.overfit_report`, additive lines that never touch the parity surface).
+- **IS parameter-robustness isosurface** — `backtester/opt_surface.py` emits the dense
+  in-sample objective grid (opt-in via `EMIT_OPT_SURFACE` / `Config.emit_opt_surface`);
+  `tools/render_surface.py` renders it.
+
+### Changed
+- **Rebased onto the v0.5.0 multi-asset substrate.** This release layers the v0.6.0
+  features (above) on top of the canonical `main`, which already carries the
+  `backtester/{panel,pairs,carry}` multi-asset core, Sortino + multi-term IS objective,
+  the additive `backtester/{metrics,objectives,orchestrator}.py` modules (sortino /
+  composite optimiser scoring / RouteKey dispatch table), and pandas-3.x / Py-3.11+
+  compatibility fixes. `backtester/__init__.py` stays the monolithic engine; the v0.6.0
+  hooks (`OVERFIT_REPORT`, `EMIT_OPT_SURFACE`, the optional OHLCV `volume` column) are
+  gated OFF by default, so every existing parity surface stays byte-identical.
+- **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
+  and `README.md`.
+- Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). One canonical performance
+  band — **23.8–57× faster, 33–65× less memory** vs this Python reference — from the
+  paper-grade harness `tools/bench_paper.py` in the Rust repo (median warm over n=5; the
+  5,000-bar 232× is a measurement-floor artifact). This single band now matches the
+  README, the paper, and `CITATION.cff`.
+
+### Notes
+- All new behaviour is opt-in; the existing parity surfaces remain byte-identical against
+  the Rust port.
+
 ## [0.4.0] — 2026-05-03
 
 ### Added
