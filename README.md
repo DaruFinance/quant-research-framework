@@ -13,7 +13,7 @@ It answers one question: *does an apparent edge survive out-of-sample evaluation
 
 ## Two engines, one spec
 
-This repository is the **Python reference** — the readable specification. A separate **Rust port** re-implements it for speed (32–76× faster, 29–68× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red — the correctness claim is *enforced, not asserted*.
+This repository is the **Python reference** — the readable specification. A separate **Rust port** re-implements it for speed (25–79× faster, 29–69× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red — the correctness claim is *enforced, not asserted*.
 
 ```
                 ┌────────────────────────────────────────────────┐
@@ -24,7 +24,7 @@ This repository is the **Python reference** — the readable specification. A se
                 ┌───────────────▼──────┐  ┌──────▼───────────────┐
                 │  Python reference    │  │      Rust port       │
                 │  backtester/         │  │  (sibling repo, …-rs)│
-                │  (this repo, the spec)│ │   speed: 32–76×      │
+                │  (this repo, the spec)│ │   speed: 25–79×      │
                 └───────────────┬──────┘  └──────┬───────────────┘
                                 │ metrics        │ metrics
                                 ▼                ▼
@@ -260,18 +260,19 @@ avoid the term *byte-identical* throughout: parity is tolerance-bounded by
 construction, not bit-equality, and is enforced continuously by the
 `parity_*.py` suite in CI.
 
-It runs **32–76× faster** (Python reference vs Rust port) and uses **29–68× less memory**:
+It runs **25–79× faster** (Python reference vs Rust port) and uses **29–69× less memory**:
 
 | Bars   | Python (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
 |-------:|-----------:|---------:|---------:|----------------:|--------------:|
-| 15,000 |       3.78 |     0.05 |   75.60× |             273 |             4 |
-| 25,000 |       4.53 |     0.11 |   41.18× |             279 |             6 |
-| 35,000 |       6.17 |     0.16 |   38.56× |             280 |             8 |
-| 48,000 |       7.92 |     0.25 |   31.68× |             291 |            10 |
+| 15,000 |       3.94 |     0.05 |   78.80× |             276 |             4 |
+| 25,000 |       5.23 |     0.12 |   43.58× |             278 |             6 |
+| 35,000 |       5.46 |     0.16 |   34.12× |             281 |             8 |
+| 48,000 |       6.54 |     0.26 |   25.15× |             291 |            10 |
 
-(Min wall-clock and max peak RSS over 3 warm runs on the bundled
-`SOLUSDT_1h.csv`. Reproduce with `python tools/bench.py` from the
-sibling repo.)
+(Median wall-clock and peak RSS over 5 warm runs on the bundled
+`SOLUSDT_1h.csv`. The high end is at small N where Rust nears timer
+resolution; the steady-state 48k row is ~25×. Reproduce with
+`python tools/bench.py --runs 5 --stat median` from the sibling Rust repo.)
 
 ## Comparison vs other open-source backtesters
 

@@ -25,8 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
   and `README.md`.
 - Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). Performance refreshed to
-  a single pass: **32–76× faster, 29–68× less memory** vs this Python reference
-  (reproduce with `tools/bench.py` from the Rust repo).
+  a single pass: **25–79× faster, 29–69× less memory** vs this Python reference
+  (median over 5 warm runs; reproduce with `tools/bench.py --runs 5 --stat median` from
+  the Rust repo). This single band now matches the README, the paper, and `CITATION.cff`.
 
 ### Notes
 - All new behaviour is opt-in; the existing parity surfaces remain byte-identical against
