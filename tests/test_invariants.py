@@ -364,15 +364,14 @@ def test_lb_cache_no_oos_leak(monkeypatch):
         "IS and OOS windows fed identical data — test cannot prove isolation"
     )
 
-    # 2) The OOS run recomputed (cache-missed) every lookback it scored: no
-    #    OOS lookback was served from a cache populated by the IS window.
+    # 2) The IS and OOS coarse passes share the common lookback grid. (The
+    #    coarse-then-fine search legitimately explores different +/-1 fine-tune
+    #    neighbours per window, so recomputed["IS"] and recomputed["OOS"] are not
+    #    identical; the real no-leak guarantee is carried by (3) below and by the
+    #    fact that, under a leaking IS-populated cache, the OOS pass would recompute
+    #    nothing and `shared` would be empty.)
     shared = recomputed["IS"] & recomputed["OOS"]
-    assert shared, "expected overlapping lookbacks between IS and OOS coarse passes"
-    leaked = [lb for lb in shared if lb not in recomputed["OOS"]]
-    assert not leaked, (
-        f"LB cache leaked across IS/OOS boundary — lookbacks {leaked[:5]} were "
-        f"scored in OOS without recomputing against OOS data"
-    )
+    assert shared, "no lookbacks scored in both windows — cannot exercise isolation"
 
     # 3) The stored OOS score for a shared lookback was computed from OOS data,
     #    not copied from IS: for the overwhelming majority of shared lookbacks
