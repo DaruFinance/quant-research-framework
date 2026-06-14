@@ -6,8 +6,15 @@ internals, lifted to the user-supplied strategy. Replace close[k:] with
 noise; re-run; signals at bars [..k) must match. A leaky strategy diverges.
 """
 import os, sys
-sys.path.insert(0, "/home/daru/quant-research-framework")
-os.environ.setdefault("BT_CSV", "/home/daru/quant-research-framework-rs/data/SOLUSDT_1h.csv")
+# Resolve the engine and data repos portably: honour QRF_PYTHON_REPO /
+# QRF_RUST_REPO when set (as in the paper's Appendix A command), else fall back
+# to the sibling layout relative to this file (…/quant-research-framework/listings).
+_PY_REPO = os.environ.get(
+    "QRF_PYTHON_REPO", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+_RS_REPO = os.environ.get(
+    "QRF_RUST_REPO", os.path.join(os.path.dirname(_PY_REPO), "quant-research-framework-rs"))
+sys.path.insert(0, _PY_REPO)
+os.environ.setdefault("BT_CSV", os.path.join(_RS_REPO, "data", "SOLUSDT_1h.csv"))
 import numpy as np, pandas as pd
 import backtester as bt
 
