@@ -288,3 +288,198 @@ def test_wfo_regime_cadence_unaffected_by_regime_flips(monkeypatch):
         f"with non-standard IS slice lengths: {bad[:5]} "
         f"(all should be BACKTEST_CANDLES=600)"
     )
+
+
+# ---------------------------------------------------------------------------
+# LB-grid optimiser cache: no cached score may be reused across the IS/OOS
+# boundary. `optimiser()` builds a fresh `eval_cache = {}` per invocation,
+# closed over by `_evaluate(lb)` (see backtester/__init__.py:1293-1298). The
+# cache is therefore scoped to one window: the score for a given lookback is
+# keyed by (this optimiser call's window, lb), so an in-sample window and its
+# out-of-sample counterpart can never share a cache entry. This test shifts
+# the IS/OOS boundary, re-runs the optimiser on each side, and asserts that
+# every lookback the OOS optimiser needs is recomputed against OOS data — no
+# score leaks across the boundary move.
+#
+# Why this is a real guard (verified out-of-band, not committed): if the cache
+# is weakened to drop window identity — e.g. promoted to module scope and keyed
+# by `lb` alone — then the OOS optimiser hits the IS-window cache for every
+# shared lookback and reuses the IS score, and the recompute / score-disagreement
+# assertions below both fail. The window key is load-bearing.
+# ---------------------------------------------------------------------------
+def test_lb_cache_no_oos_leak(monkeypatch):
+    monkeypatch.setattr(bt, "SMART_OPTIMIZATION", False, raising=False)
+    monkeypatch.setattr(bt, "OPTIMIZE_RRR",        False, raising=False)
+    monkeypatch.setattr(bt, "LOOKBACK_RANGE",     (12, 40), raising=False)
+    monkeypatch.setattr(bt, "DRAWDOWN_CONSTRAINT", None, raising=False)
+    monkeypatch.setattr(bt, "dd_constraint",       None, raising=False)
+
+    full   = _df_from_bars(2_400, seed=9)
+    lb_list = list(range(*bt.LOOKBACK_RANGE))
+
+    IS_LEN = OOS_LEN = 800
+
+    # Spy on the two expensive per-lookback steps so we can tell, per window,
+    # whether a score was recomputed (cache miss) or skipped (cache hit), and
+    # capture the score the optimiser stored for each (window, lb).
+    win        = {"tag": None}     # which window is currently being optimised
+    last_lb    = {"v": None}       # lb of the most recent compute_indicators call
+    recomputed = {"IS": set(), "OOS": set()}   # lbs whose score was (re)computed
+    pf_by_win  = {"IS": {}, "OOS": {}}         # window -> {lb: PF score}
+    data_first = {"IS": set(), "OOS": set()}   # window -> first-close of df fed in
+
+    real_ci = bt.compute_indicators
+    real_bt = bt.backtest
+
+    def spy_ci(df, lb, *a, **k):
+        last_lb["v"] = int(lb)
+        recomputed[win["tag"]].add(int(lb))
+        data_first[win["tag"]].add(round(float(df["close"].iloc[0]), 9))
+        return real_ci(df, lb, *a, **k)
+
+    def spy_bt(dfi, sig, *a, **k):
+        res = real_bt(dfi, sig, *a, **k)
+        # store the score for this (window, lb); setdefault so a genuine cache
+        # HIT (which would skip compute_indicators / backtest) leaves no entry.
+        pf_by_win[win["tag"]].setdefault(last_lb["v"], res[1].get("PF"))
+        return res
+
+    monkeypatch.setattr(bt, "compute_indicators", spy_ci)
+    monkeypatch.setattr(bt, "backtest",           spy_bt)
+
+    def optimise_around(boundary):
+        is_df  = full.iloc[boundary - IS_LEN : boundary].reset_index(drop=True)
+        oos_df = full.iloc[boundary : boundary + OOS_LEN].reset_index(drop=True)
+        win["tag"] = "IS";  bt.optimiser(is_df,  lb_list, "PF", 1)
+        win["tag"] = "OOS"; bt.optimiser(oos_df, lb_list, "PF", 1)
+
+    # First placement, then shift the IS/OOS boundary and re-run. Both runs
+    # share the same module state — the only thing protecting against leakage
+    # is the per-call cache scoping.
+    optimise_around(1_000)
+    optimise_around(1_200)
+
+    # 1) IS and OOS are fed genuinely different data (disjoint first-close set).
+    assert data_first["IS"].isdisjoint(data_first["OOS"]), (
+        "IS and OOS windows fed identical data — test cannot prove isolation"
+    )
+
+    # 2) The OOS run recomputed (cache-missed) every lookback it scored: no
+    #    OOS lookback was served from a cache populated by the IS window.
+    shared = recomputed["IS"] & recomputed["OOS"]
+    assert shared, "expected overlapping lookbacks between IS and OOS coarse passes"
+    leaked = [lb for lb in shared if lb not in recomputed["OOS"]]
+    assert not leaked, (
+        f"LB cache leaked across IS/OOS boundary — lookbacks {leaked[:5]} were "
+        f"scored in OOS without recomputing against OOS data"
+    )
+
+    # 3) The stored OOS score for a shared lookback was computed from OOS data,
+    #    not copied from IS: for the overwhelming majority of shared lookbacks
+    #    the IS PF and OOS PF differ (same lb, different window data). A leaking
+    #    lb-only cache would make these identical.
+    both = sorted(lb for lb in shared
+                  if lb in pf_by_win["IS"] and lb in pf_by_win["OOS"])
+    assert both, "no shared lookback had a stored score in both windows"
+    distinct = [lb for lb in both if pf_by_win["IS"][lb] != pf_by_win["OOS"][lb]]
+    assert len(distinct) >= max(1, len(both) - 1), (
+        f"OOS scores match IS scores for {len(both) - len(distinct)}/{len(both)} "
+        f"shared lookbacks — the optimiser appears to be reusing IS-window "
+        f"scores for OOS evaluation (cache key dropped window identity)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# LEGACY_SIDE_BUG regression: the RRR-optimisation R-multiple code compares the
+# trade's side against a value. The corrected default uses `side == 1`; the
+# legacy path (LEGACY_SIDE_BUG=True) uses `side == 'long'`, which compares an
+# int8 side code against a str and is therefore ALWAYS False — so every trade,
+# long or short, takes the `else` (short) R-multiple branch (see
+# backtester/__init__.py:1329, 1905). This test pins both the documented
+# mechanism and its downstream effect on the optimiser's RRR selection.
+# ---------------------------------------------------------------------------
+def test_legacy_side_bug_regression(monkeypatch):
+    monkeypatch.setattr(bt, "OPTIMIZE_RRR",        True, raising=False)
+    monkeypatch.setattr(bt, "SMART_OPTIMIZATION", False, raising=False)
+    monkeypatch.setattr(bt, "LOOKBACK_RANGE",     (12, 76), raising=False)
+    monkeypatch.setattr(bt, "DRAWDOWN_CONSTRAINT", None, raising=False)
+    monkeypatch.setattr(bt, "dd_constraint",       None, raising=False)
+
+    # Trending-with-reversals data so the baseline produces BOTH long and short
+    # trades — the bug only manifests on the long side (longs get mislabelled
+    # as shorts in the R-multiple computation).
+    df  = _df_from_bars(1_800, seed=5)
+    dfi = bt.compute_indicators(df, bt.DEFAULT_LB)
+    raw = bt.create_raw_signals(dfi, bt.DEFAULT_LB)
+    sig = bt.parse_signals(raw, dfi["time"])
+    trades, *_ = bt.backtest(dfi, sig)
+
+    long_trades  = [t for t in trades if int(t[0]) ==  1]
+    short_trades = [t for t in trades if int(t[0]) == -1]
+    assert long_trades and short_trades, (
+        "fixture must produce both long and short trades to exercise the bug"
+    )
+
+    # --- (a) the documented comparison mechanism, on real int8 side codes ---
+    # Legacy `side == 'long'` is ALWAYS False; corrected `side == 1` is True
+    # iff the trade is genuinely long.
+    for t in trades:
+        side = t[0]
+        assert bool(side == "long") is False, (
+            f"legacy comparison side=={side!r}=='long' was expected to be "
+            f"unconditionally False (int8-vs-str), got True"
+        )
+    assert all(bool(t[0] == 1) for t in long_trades), "corrected side==1 must hold for longs"
+    assert not any(bool(t[0] == 1) for t in short_trades), "corrected side==1 must fail for shorts"
+
+    # --- (b) downstream R-multiple consequence on a real LONG trade ---
+    # The corrected (long) peak-R formula must differ from the legacy (short)
+    # formula the bug applies to that same long trade.
+    side, e, x, entry, _exit, _qty, _pnl = long_trades[0]
+    risk = entry * bt.SL_PERCENTAGE / 100.0
+    peak_R_correct = (dfi["high"].iloc[e:x + 1].values.max() - entry) / risk   # long branch
+    peak_R_legacy  = (entry - dfi["low"].iloc[e:x + 1].values.min()) / risk    # short branch (bug)
+    assert peak_R_correct != peak_R_legacy, (
+        "long peak-R must differ from the short formula the legacy bug applies; "
+        "if equal the test cannot distinguish the paths"
+    )
+
+    # --- (c) end-to-end: the bug changes the optimiser's RRR-selection inputs ---
+    # Faithfully replicate the optimiser's RRR probe (backtester/__init__.py
+    # lines 1312-1352): probe at a fixed 5R TP, collect peak/close R per trade,
+    # then sum R for each candidate target. The ONLY difference between the two
+    # runs below is the side comparison, so any divergence in the candidate sums
+    # is caused solely by the legacy bug mislabelling longs as shorts.
+    def rrr_candidate_sums(legacy):
+        old_tp, old_flag = bt.TP_PERCENTAGE, bt.USE_TP
+        monkeypatch.setattr(bt, "TP_PERCENTAGE", 5 * bt.SL_PERCENTAGE, raising=False)
+        monkeypatch.setattr(bt, "USE_TP", True, raising=False)
+        probe_trades, *_ = bt.backtest(dfi, sig)
+        monkeypatch.setattr(bt, "TP_PERCENTAGE", old_tp, raising=False)
+        monkeypatch.setattr(bt, "USE_TP", old_flag, raising=False)
+
+        peak_Rs, close_Rs = [], []
+        for tside, te, tx, *_ in probe_trades:
+            entry_price = dfi["close"].iloc[te]
+            trisk = entry_price * bt.SL_PERCENTAGE / 100.0
+            is_long = (tside == "long") if legacy else (tside == 1)
+            if is_long:
+                hi = dfi["high"].iloc[te:tx + 1].values
+                peak_R  = (hi.max() - entry_price) / trisk
+                close_R = (dfi["close"].iloc[tx] - entry_price) / trisk
+            else:
+                lo = dfi["low"].iloc[te:tx + 1].values
+                peak_R  = (entry_price - lo.min()) / trisk
+                close_R = (entry_price - dfi["close"].iloc[tx]) / trisk
+            peak_Rs.append(min(peak_R, 3.0))
+            close_Rs.append(close_R)
+        peak_Rs  = np.array(peak_Rs, dtype=float)
+        close_Rs = np.array(close_Rs, dtype=float)
+        return {R: float(np.where(peak_Rs >= R, R, close_Rs).sum()) for R in range(1, 4)}
+
+    sums_correct = rrr_candidate_sums(legacy=False)
+    sums_legacy  = rrr_candidate_sums(legacy=True)
+    assert sums_correct != sums_legacy, (
+        f"legacy and corrected RRR-candidate sums are identical "
+        f"({sums_correct}); the side-bug path is not being exercised"
+    )

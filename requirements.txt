@@ -6,3 +6,4 @@ numba
 pytz
 requests
 hypothesis
+scikit-learn
