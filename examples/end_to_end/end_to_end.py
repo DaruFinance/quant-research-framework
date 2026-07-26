@@ -12,7 +12,7 @@ it into the engine with a single assignment, and runs the default flow:
 
 The overfitting block is opt-in: it is enabled here by setting QRF_OVERFIT=1
 *before* importing the engine (the flag is read at import time). Everything
-else is the engine's normal default pipeline — no private APIs.
+else is the engine's normal default pipeline, no private APIs.
 
 Run:
     python examples/end_to_end/end_to_end.py
@@ -56,7 +56,7 @@ import backtester as bt                                     # noqa: E402
 
 
 def sma_cross_rsi(df: pd.DataFrame, lb: int) -> np.ndarray:
-    """Dual-SMA crossover with an RSI(14) momentum floor — small and original.
+    """Dual-SMA crossover with an RSI(14) momentum floor, small and original.
 
     Every indicator is `.shift(1)`-ed, so `raw[i]` uses only bars <= i-1 and
     obeys the no-look-ahead contract the engine enforces at the ledger level.

@@ -1,6 +1,6 @@
 """Tests for the walk-forward orchestrator dispatch table.
 
-Pure routing layer — the registered functions retain their original
+Pure routing layer, the registered functions retain their original
 lookahead-leak and parity guarantees, and these tests assert only that
 the dispatch table itself routes the four Phase-1-relevant key
 combinations correctly.

@@ -1,7 +1,7 @@
 """Hypothesis-based property tests for the strategy contract.
 
 These complement the example-based tests in `test_invariants.py`
-(which use fixed seeds — kept as regression cases for specific bugs)
+(which use fixed seeds, kept as regression cases for specific bugs)
 by letting Hypothesis search for counter-examples across a generated
 input space, with shrinking on failure.
 
@@ -78,7 +78,7 @@ def test_max_hold_bars_no_leak_property(seed: int, n: int, lb: int, max_hold: in
 
 def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
     """MAX_HOLD_BARS=0 (default) must produce bit-identical output to
-    the pre-#46 kernel — the in-loop check is guarded by `max_hold_bars
+    the pre-#46 kernel, the in-loop check is guarded by `max_hold_bars
     > 0` and must not perturb any trade when off. Run a small fixture
     twice (default vs explicit 0) and assert trade lists equal."""
     df = bt.load_ohlc("tests/fixtures/sol_1h_30000_31000.csv")
@@ -104,7 +104,7 @@ def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
 def test_harness_catches_known_leak():
     """A deliberately leaky function must trip assert_no_lookahead.
 
-    Constructs a fake regime detector that returns ``close.shift(-1)`` —
+    Constructs a fake regime detector that returns ``close.shift(-1)``,
     i.e. uses tomorrow's price to label today. The harness should detect
     that polluting future rows changes the output for earlier rows and
     raise AssertionError naming the offending invariant.
@@ -112,7 +112,7 @@ def test_harness_catches_known_leak():
     from backtester.invariants import InvariantSpec, assert_no_lookahead
 
     def leaky_detector(df):
-        # Shifts the NEXT bar's close back into today's label — clear leak.
+        # Shifts the NEXT bar's close back into today's label: clear leak.
         return df["close"].shift(-1).fillna(0.0)
 
     spec = InvariantSpec(name="leaky_sentinel", func=leaky_detector,
@@ -139,7 +139,7 @@ def test_harness_passes_lookahead_free_function():
     from backtester.invariants import InvariantSpec, assert_no_lookahead
 
     def clean_detector(df):
-        # 20-bar SMA threshold — uses only df.close up to and including
+        # 20-bar SMA threshold: uses only df.close up to and including
         # the labelled bar.
         sma = df["close"].rolling(20, min_periods=1).mean()
         return (df["close"] > sma).astype(int)
@@ -159,7 +159,7 @@ def test_registered_invariants_pass_default_pollute():
     from backtester.invariants import list_invariants, assert_no_lookahead
 
     specs = list_invariants()
-    assert specs, "registry is empty — default_regime_detector should register on import"
+    assert specs, "registry is empty, default_regime_detector should register on import"
     df = _df_from(seed=44, n=500)
     df["EMA_200"] = df["close"].ewm(span=200, adjust=False).mean()
     for spec in specs:

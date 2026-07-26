@@ -3,8 +3,8 @@
 This is a research-grade backtester whose central design discipline is
 **parity with the Rust port** at
 [`quant-research-framework-rs`](https://github.com/DaruFinance/quant-research-framework-rs).
-That parity is what gives every other claim — performance, walk-forward
-fit, robustness — its credibility. Contributing here means preserving
+That parity is what gives every other claim, performance, walk-forward
+fit, robustness, its credibility. Contributing here means preserving
 the discipline.
 
 ## The parity invariant

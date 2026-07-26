@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""renderer — interactive 3D iso-Sharpe isosurface (3-axis) OR lookback
+"""renderer, interactive 3D iso-Sharpe isosurface (3-axis) OR lookback
 robustness ridge (2-axis) + 2D heatmap slices + per-window robustness score for
 the IN-SAMPLE objective landscape. Engine-agnostic; reads opt_surface.{csv,
 parquet} (sibling of trade_list.csv).
@@ -51,7 +51,7 @@ def load_surface(path: Path) -> pd.DataFrame:
 
 def load_oos_pick(run_dir: Path) -> Optional[dict]:
     """Pair the IS landscape with realised OOS from trade_list.csv (cols
-    'sample','pnl' — verified against both engines). Loud skip if absent."""
+    'sample','pnl', verified against both engines). Loud skip if absent."""
     tl = run_dir / "trade_list.csv"
     if not tl.exists():
         return None
@@ -83,7 +83,7 @@ def robustness_score(g: pd.DataFrame, metric: str, tol: float) -> dict:
                      not robust, so we flag negative-peak windows.
     peak_sharpness = PF(peak cell) / min(PF of lb-neighbours). This APPROXIMATES
                      (does not replay) SMART_OPTIMIZATION's `pf_cand > 1.10 *
-                     pf_neigh for EITHER neighbour` guard — `> either` == `>
+                     pf_neigh for EITHER neighbour` guard, `> either` == `>
                      1.10 * min(neighbours)`. >1.10 flags a fragile needle.
                      Computed on PF (the engine's spike test is on PF regardless
                      of OPT_METRIC) at the PF-argmax cell.
@@ -185,7 +185,7 @@ def _fig_heatmaps(g: pd.DataFrame, metric: str):
         if j == 1:
             fig.update_yaxes(title_text="RRR", row=1, col=j)
     fig.update_layout(
-        title=f"IS objective landscape — {metric} heatmap slices (in-sample)",
+        title=f"IS objective landscape, {metric} heatmap slices (in-sample)",
         margin=dict(l=0, r=0, t=60, b=0))
     return fig
 
@@ -240,7 +240,7 @@ def main() -> int:
     smode = df["sharpe_mode"].iloc[0] if "sharpe_mode" in df.columns else "trade"
     oos = load_oos_pick(run_dir)
 
-    print(f"\nIN-SAMPLE OBJECTIVE LANDSCAPE — robustness diagnostics "
+    print(f"\nIN-SAMPLE OBJECTIVE LANDSCAPE, robustness diagnostics "
           f"(metric={args.metric}, sharpe_mode={smode}, plateau tol={args.tol:.0%})")
     print(f"{'window':>8} {'regime':>10} {'peak':>10} {'plateau%':>9} "
           f"{'pf/min-neigh':>12} {'cells':>6}")
@@ -259,13 +259,13 @@ def main() -> int:
               f"trades={oos['oos_trades']} total_pnl={oos['oos_total_pnl']:.4g} "
               f"PF={oos['oos_pf']:.3f} win_rate={oos['oos_win_rate']:.1%}")
     else:
-        print("\n(no trade_list.csv OOS rows found — OOS pairing skipped)")
+        print("\n(no trade_list.csv OOS rows found, OOS pairing skipped)")
 
     try:
         import plotly.graph_objects as go  # noqa: F401
         have_plotly = True
     except ImportError:
-        sys.stderr.write("plotly not installed — emitting PNG only. For "
+        sys.stderr.write("plotly not installed, emitting PNG only. For "
                          "interactive HTML: pip install "
                          "quant-research-framework[surface]\n")
         have_plotly = False
@@ -273,7 +273,7 @@ def main() -> int:
 
     out_html = Path(args.out) if args.out else (run_dir / "opt_surface.html")
     kind = "3D iso-Sharpe isosurface" if three_axis else "2-axis lookback ridge"
-    title = (f"IN-SAMPLE objective landscape — {kind} ({args.metric}, "
+    title = (f"IN-SAMPLE objective landscape, {kind} ({args.metric}, "
              f"sharpe={smode}) [NOT OOS performance]")
 
     if have_plotly:
@@ -288,7 +288,7 @@ def main() -> int:
         if fig_hm is not None:
             html += ["<hr>", to_html(fig_hm, include_plotlyjs=False, full_html=False)]
         if oos:
-            html.append(f"<p><b>Engine pick — ACTUAL OOS</b> (paired, not the "
+            html.append(f"<p><b>Engine pick, ACTUAL OOS</b> (paired, not the "
                         f"surface): trades={oos['oos_trades']}, "
                         f"PF={oos['oos_pf']:.3f}, win_rate={oos['oos_win_rate']:.1%}, "
                         f"total_pnl={oos['oos_total_pnl']:.4g}</p>")

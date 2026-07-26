@@ -5,13 +5,13 @@ ML signal example (pre-computed predictions).
 
 Pattern: train your model offline, attach its predictions to the OHLC frame
 as a column (here: ``pred``), and let the strategy function threshold that
-column into long/short intents. The backtester never sees your model — it
+column into long/short intents. The backtester never sees your model, it
 just consumes a numpy array of signals like every other strategy.
 
 This is the recommended path when you can train ahead of time:
   * fast (no per-bar inference inside the inner loop)
   * trivially compatible with any framework (sklearn, lightgbm, torch, jax,
-    R, MATLAB, ONNX, ...) — you just need a CSV/Parquet column of scores
+    R, MATLAB, ONNX, ...), you just need a CSV/Parquet column of scores
   * easy to audit: one column in, one signal out
 
 Look-ahead discipline: the predictor's score for bar ``i`` must only use
@@ -48,7 +48,7 @@ def _ensure_predictions(df: pd.DataFrame) -> pd.DataFrame:
     If ``df`` already carries a `pred` column we use it as-is. Otherwise we
     fall back to a tiny, deterministic stand-in so the example runs on any
     OHLC CSV without needing a model file. The stand-in is *not* a real
-    strategy — it just demonstrates the data shape the backtester expects.
+    strategy, it just demonstrates the data shape the backtester expects.
     """
     if PRED_COL in df.columns:
         return df
@@ -66,7 +66,7 @@ def _ensure_predictions(df: pd.DataFrame) -> pd.DataFrame:
 def ml_precomputed_signals(df: pd.DataFrame, lb: int) -> np.ndarray:
     """
     Strategy function. Reads ``df[PRED_COL]`` and turns it into a raw
-    signal array. The ``lb`` argument is unused here — pre-computed
+    signal array. The ``lb`` argument is unused here, pre-computed
     predictions don't sweep a look-back. Set ``LOOKBACK_RANGE = (1, 2)`` in
     backtester to keep the optimiser from wasting work, or ignore it (the
     optimiser will still pick the single non-trivial point).

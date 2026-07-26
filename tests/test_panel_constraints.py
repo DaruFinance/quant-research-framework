@@ -46,7 +46,7 @@ def test_single_asset_cap_redistributes_excess_to_unbound_legs():
 
 def test_single_asset_cap_drops_excess_when_no_headroom():
     """If every leg hits cap before the residual is absorbed, the
-    remaining excess is dropped — the gross shrinks. With cap=0.3 and
+    remaining excess is dropped, the gross shrinks. With cap=0.3 and
     3 legs, max gross is 0.9; inputs that sum to >0.9 lose mass."""
     w = np.array([0.5, 0.3, 0.2])  # gross 1.0, but 3 * 0.3 = 0.9 max
     out = apply_constraints(w, single_asset_max=0.3)
@@ -57,7 +57,7 @@ def test_single_asset_cap_drops_excess_when_no_headroom():
 
 
 def test_single_asset_cap_idempotent():
-    """Applying twice equals applying once — caps are stable."""
+    """Applying twice equals applying once, caps are stable."""
     w = np.array([0.5, 0.3, 0.2])
     once = apply_constraints(w, single_asset_max=0.3)
     twice = apply_constraints(once, single_asset_max=0.3)
@@ -136,7 +136,7 @@ def test_constraints_are_pure_no_side_effects_on_input():
 def test_constraints_locality_pointwise():
     """Calling apply_constraints on a portion of a weight vector
     produces the same result as calling on the whole vector, then
-    slicing — i.e. constraints don't read outside their input."""
+    slicing, i.e. constraints don't read outside their input."""
     full = np.array([0.5, 0.3, 0.2, -0.4, -0.3])
     partial = full[:3]
     full_out = apply_constraints(full, single_asset_max=0.3)
@@ -148,7 +148,7 @@ def test_constraints_locality_pointwise():
 
 
 # ---------------------------------------------------------------------------
-# G3 — 5 rebalances with cap binding
+# G3: 5 rebalances with cap binding
 # ---------------------------------------------------------------------------
 def test_g3_5_rebalances_redistribution_audit():
     """5 synthetic rebalance vectors where SOL is the over-cap leg;

@@ -15,7 +15,7 @@ asset alone. Item #6 (ERC sizing), #7 (β-/$-/σ-neutral), #8
 core stays the same.
 
 The panel WFO uses the same global window grid (cur_start advances by
-``WFO_TRIGGER_VAL`` candles per iteration) as the single-asset path —
+``WFO_TRIGGER_VAL`` candles per iteration) as the single-asset path ,
 multi-asset iteration does NOT shift window boundaries per asset.
 """
 from __future__ import annotations

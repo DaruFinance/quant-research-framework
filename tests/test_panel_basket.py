@@ -35,7 +35,7 @@ def _signs(weights: dict) -> dict:
 # ---------------------------------------------------------------------------
 def test_basket_exactly_one_long_one_short_per_rebalance():
     """At any `t` past warmup, the basket selects exactly 1 long
-    and 1 short — the plan's verification expectation."""
+    and 1 short, the plan's verification expectation."""
     panel = load_panel(PANEL_PATHS)
     basket = LongShortBasket(
         alpha_fn=momentum_alpha(lookback=20),

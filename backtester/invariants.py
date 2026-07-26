@@ -24,12 +24,12 @@ to the un-polluted call.
 Pollution kinds
 ---------------
 
-- ``"ohlc_df"`` — OHLC DataFrame; pollutes ``close/open/high/low`` at
+- ``"ohlc_df"``: OHLC DataFrame; pollutes ``close/open/high/low`` at
   rows ``>= cut`` with NaN.
-- ``"panel"`` — long-format Parquet-style panel
+- ``"panel"``: long-format Parquet-style panel
   (``time, asset, open, high, low, close``); pollutes rows where
   ``time >= cut_time`` (caller passes a time index, not a row index).
-- ``"series"`` — 1-D Series of floats; pollutes positions ``>= cut``
+- ``"series"``: 1-D Series of floats; pollutes positions ``>= cut``
   with NaN.
 
 Adding a new data kind is a one-line addition to ``_default_pollute``.

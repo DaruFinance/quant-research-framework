@@ -81,7 +81,7 @@ def aggregate_legs(legs: Iterable) -> List[Trade]:
     and `trade_group_id=row_index`).
 
     Returns `List[Trade]` sorted by `group_id`, each Trade's `legs`
-    sorted by `leg_id`. Pure data-only — no series indexing — so the
+    sorted by `leg_id`. Pure data-only (no series indexing) so the
     function is trivially lookahead-free.
     """
     groups: defaultdict = defaultdict(list)
@@ -136,7 +136,7 @@ def print_trade_audit(
     Picks indices {0, N/4, N/2, 3N/4, N-1} (deduplicated for small N)
     and prints each trade's legs with the indicator values at
     `entry_idx`. The indicator dump is the cornerstone of the
-    lookahead audit — every value listed has an index `<= entry_idx`.
+    lookahead audit, every value listed has an index `<= entry_idx`.
     """
     legs_input = list(trades_or_legs)
     if not legs_input:

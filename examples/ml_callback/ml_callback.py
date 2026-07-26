@@ -9,10 +9,10 @@ your model is online (state changes through the run) or when you want
 training and inference to live in the same process.
 
 Trade-offs vs. the pre-computed path (`examples/ml_precomputed`):
-  * Slower — Python-level inference inside the inner loop.
-  * Trickier look-ahead discipline — features for bar ``i`` must come from
+  * Slower: Python-level inference inside the inner loop.
+  * Trickier look-ahead discipline: features for bar ``i`` must come from
     ``df[: i]`` only. The helper ``extract_window_features`` enforces this.
-  * More flexible — works with any predictor that has a ``.predict(x)``
+  * More flexible: works with any predictor that has a ``.predict(x)``
     method (sklearn, pytorch, your own class).
 
 The demo predictor below is a hand-coded linear model so this example has
@@ -41,7 +41,7 @@ import backtester as bt                                   # noqa: E402
 # --- Predictor protocol ----------------------------------------------------
 # Anything that exposes ``predict(features: np.ndarray) -> float`` (one
 # probability/score per call) plugs straight in. Replace the demo below with
-# your own model class — load weights in __init__, do inference in predict.
+# your own model class: load weights in __init__, do inference in predict.
 
 class TinyMomentumModel:
     """Deterministic linear model: weighted sum of normalised lagged
@@ -67,7 +67,7 @@ def extract_window_features(df: pd.DataFrame, i: int, lb: int) -> np.ndarray:
     """
     Build a feature vector for bar ``i`` using only data from bars
     ``[i - lb, i - 1]`` (no look-ahead). Returns ``np.empty`` when not
-    enough history exists yet — caller should treat that as "no signal".
+    enough history exists yet, caller should treat that as "no signal".
     """
     if i <= lb:
         return np.empty(0, dtype=float)

@@ -14,7 +14,7 @@ Why this pattern:
     from data at or before bar i-1, enforced via shift(1).
   - Labels are remapped after fit so the same physical regime
     (e.g. "low-volatility, trending") gets the same string label
-    across runs — KMeans's raw cluster IDs are arbitrary.
+    across runs, KMeans's raw cluster IDs are arbitrary.
 
 Run:
     BT_CSV=data_SOLUSDT_1h.csv \\
@@ -84,7 +84,7 @@ def ml_kmeans_detect_regimes(df: pd.DataFrame) -> pd.Series:
     X_train = feats.iloc[is_start:oos_start].dropna()
 
     if len(X_train) < 100:
-        # Degenerate fixture — return a constant label so the engine
+        # Degenerate fixture: return a constant label so the engine
         # still has well-defined regimes. Demo-only fallback.
         return pd.Series(["Calm"] * n, index=df.index)
 

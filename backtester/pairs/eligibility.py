@@ -4,7 +4,7 @@ Quick acceptance tests applied to a candidate spread before any
 trading decision:
 
 - ``half_life_ou``: OU half-life estimate. A spread with half-life
-  outside ``[h_min, h_max]`` is rejected — too fast and slippage
+  outside ``[h_min, h_max]`` is rejected, too fast and slippage
   dominates; too slow and inventory cost dominates.
 - ``is_eligible_pair``: dispatcher applying the full filter stack
   (ADF p-value, half-life, optional volume floor).
@@ -34,7 +34,7 @@ def half_life_ou(spread: np.ndarray) -> float:
     returns ``ln(2) / lambda``. Caller must pass a NaN-free spread.
 
     Returns ``+inf`` if the regression slope is non-negative (i.e. no
-    mean reversion detected) — half-life is undefined.
+    mean reversion detected), half-life is undefined.
     """
     s = np.asarray(spread, dtype=np.float64)
     s = s[~np.isnan(s)]
@@ -59,7 +59,7 @@ def is_eligible_pair(
     so the caller can log why a pair was rejected.
 
     ``p_value`` is the ADF (or whichever cointegration test) p-value;
-    the function does not run the test itself — that lives in the
+    the function does not run the test itself, that lives in the
     screener (#9).
     """
     crit = criteria or EligibilityCriteria()

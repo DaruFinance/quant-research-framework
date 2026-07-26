@@ -57,7 +57,7 @@ def dispatch(key: RouteKey) -> Callable[..., Any]:
     """Resolve a dispatch key to its registered function.
 
     Raises ``KeyError`` with the set of currently-registered keys when
-    ``key`` is missing — surface "no route for this feature combination
+    ``key`` is missing, surface "no route for this feature combination
     yet" loudly rather than fall back to a default that hides a bug.
     """
     if key not in DISPATCH:

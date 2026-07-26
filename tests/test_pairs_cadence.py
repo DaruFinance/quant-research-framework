@@ -1,4 +1,4 @@
-"""Tests for the spread re-estimation cadence engine (Phase 3 — HIGH-RISK)."""
+"""Tests for the spread re-estimation cadence engine (Phase 3, HIGH-RISK)."""
 from __future__ import annotations
 
 from pathlib import Path

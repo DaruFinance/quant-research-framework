@@ -1,9 +1,9 @@
-"""Carry / basis / funding plugin (Phase 3 T6 — items #38..#43).
+"""Carry / basis / funding plugin (Phase 3 T6, items #38..#43).
 
 This subpackage hosts the loaders, triggers, scheduler, and signal
 models for the T6 strategy tree (funding, basis, OI, on-chain).
 Stays optional behind the ``[pairs]`` / ``[carry]`` extras of the
-top-level package — see ``pyproject.toml``.
+top-level package, see ``pyproject.toml``.
 
 Public surface re-exported here for convenience. Individual modules
 keep their lazy import shape so importing ``backtester.carry`` does

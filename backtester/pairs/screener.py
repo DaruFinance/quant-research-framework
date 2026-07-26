@@ -1,4 +1,4 @@
-"""Pair / spread screener (Phase 3 — HIGH-RISK).
+"""Pair / spread screener (Phase 3, HIGH-RISK).
 
 Given a panel and a screening window ending at ``t_idx``, evaluate
 every pair `(a, b)` of assets with one of the supported methods and
@@ -11,8 +11,8 @@ change the returned pair list. The 10-window pollute test in
 
 Supported methods (Phase 3 launch):
 
-- ``engle_granger`` — co-integration ADF p-value on the OLS residual.
-- ``distance_ssd`` — sum of squared deviations between standardised
+- ``engle_granger``: co-integration ADF p-value on the OLS residual.
+- ``distance_ssd``: sum of squared deviations between standardised
   log-prices over the window. Lower = closer.
 - (Future) ``johansen``, ``copula``, ``pca``, ``ml_cluster``.
 """
@@ -77,7 +77,7 @@ def screen_pairs(
     """Score every ordered pair ``(a, b)`` with ``a < b`` (by panel
     ordering) over the ``lookback`` bars ending at ``t_idx``. Returns
     a list sorted by score (ascending for engle_granger p-value,
-    ascending for distance — lower is better in both cases).
+    ascending for distance, lower is better in both cases).
 
     Reads only ``panel`` cells at row indices ``<= t_idx``. Polluting
     rows past ``t_idx`` cannot change the returned pair list.

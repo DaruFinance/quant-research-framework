@@ -16,7 +16,7 @@ Strategies registered here use only the engine's documented public
 indicators (SMA, EMA, ATR, RSI, MACD, Stoch); no proprietary signals.
 
 Pin BLAS / OMP / MKL to one thread per process *before* importing
-numpy / pandas / numba — the Numba inner loop is already
+numpy / pandas / numba, the Numba inner loop is already
 parallelisable across processes, and oversubscribing BLAS threads
 inside each process kills throughput.
 
@@ -53,7 +53,7 @@ import pandas as pd
 
 
 # ---------------------------------------------------------------------------
-# Strategy library — pure-Python signal generators on the documented contract
+# Strategy library: pure-Python signal generators on the documented contract
 # (df: DataFrame, lb: int) -> np.ndarray[int8] of {-1, 0, +1} per bar.
 #
 # Every signal returned is shifted by one bar (`take(idx-1, mode="clip")`)

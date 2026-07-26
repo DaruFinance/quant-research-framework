@@ -99,7 +99,7 @@ class LongShortBasket:
     def positions(self, panel: PanelData, t_idx: int) -> Dict[str, float]:
         """Return per-asset weights as ``{asset: weight}``.
 
-        Reads only ``panel`` cells at row indices ``<= t_idx`` —
+        Reads only ``panel`` cells at row indices ``<= t_idx``,
         consult the alpha at ``t_idx`` and the returns window
         ``[t_idx - returns_lookback, t_idx)``.
         """
@@ -121,7 +121,7 @@ class LongShortBasket:
             return {a: 0.0 for a in panel.assets}
 
         # Argsort ignoring NaNs by mapping them to -inf for shorts /
-        # +inf for longs — they fall to the bottom of the ranking
+        # +inf for longs: they fall to the bottom of the ranking
         # automatically.
         order_asc = np.argsort(np.where(np.isnan(alpha), np.inf, alpha))
         order_desc = order_asc[::-1]

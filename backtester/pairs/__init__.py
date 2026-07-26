@@ -4,11 +4,11 @@ Optional package. Pulled via ``pip install quant-research-framework[pairs]``.
 Builds on the panel substrate to expose:
 
 - Spread-definition primitives (log-ratio, OLS-residual, Kalman β,
-  PCA-residual, ML-residual) — item #10.
-- Spread screener (Engle-Granger, Johansen, distance/SSD, ...) — #9.
-- Spread re-estimation cadence — #11 (HIGH-RISK).
-- Spread-aware SL families — #12.
-- Pre-screening eligibility filters — #13.
+  PCA-residual, ML-residual), item #10.
+- Spread screener (Engle-Granger, Johansen, distance/SSD, ...): #9.
+- Spread re-estimation cadence: #11 (HIGH-RISK).
+- Spread-aware SL families: #12.
+- Pre-screening eligibility filters: #13.
 """
 from __future__ import annotations
 

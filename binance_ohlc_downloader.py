@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Binance OHLC Downloader — full-history klines via API and/or Binance Vision archive
+Binance OHLC Downloader, full-history klines via API and/or Binance Vision archive
 
 What it does
 ------------
@@ -354,7 +354,7 @@ class ArchiveDownloader:
                 total += self._write_zip_csv_rows(z, out_path, month_start_ms, month_end_ms)
             else:
                 # fall back to daily only if the month intersects with end month (often current month)
-                # or if explicitly earlier but monthly missing — try dailies anyway
+                # or if explicitly earlier but monthly missing: try dailies anyway
                 print(f"[ARCHIVE] {symbol} {self.interval} {year}-{month:02d}: monthly not found, trying daily")
                 day = 1
                 while True:

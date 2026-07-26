@@ -13,7 +13,7 @@ This mirrors the proprietary spec `ATR_x_EMA50_RSIge50` from
 run_strategies.py, but written the way an end user would: one file, no
 framework metadata, indicators imported from the bundled
 indicators_tradingview.py. The only thing we override in backtester is
-`create_raw_signals` — everything else (IS/OOS split, smart optimiser,
+`create_raw_signals`, everything else (IS/OOS split, smart optimiser,
 walk-forward, robustness, Monte Carlo, trade export) is reused as-is.
 
 Run from the repo root:

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/DaruFinance/quant-research-framework/blob/v2-main/docs/schemas/trade_log_v1.json",
-  "title": "Trade-log v1 — per-leg row schema",
-  "description": "The shared trade-log row schema frozen by Phase 1 item #2 (multi-leg ledger) and item #3 (per-leg cost decomposition). Every backtest in this framework — and every cross-language port (`quant-research-framework-rs`) — emits per-leg rows in this 14-column form. Downstream consumers (REPO 2 quant-mm-simulator + quant-mm-simulator-rs, the strategy-pnl-daily-rs ETL, the verification gate logs) read this contract and nothing else; new fields can be added in v2 only as additive tail columns to preserve byte-for-byte parity of legacy 7-tuple loaders.\n\nReferences: backtester/ledger.py (Python source of truth) and src/lib.rs Trade struct (Rust mirror) at tag v0.7.0-pairs-carry. The kernel-emitted 9-tuple is a strict prefix of this 14-tuple; the 5 cost-decomposition fields trail at the end so that legacy 7-tuple and 9-tuple consumers continue to parse correctly via aggregate_legs.",
+  "title": "Trade-log v1, per-leg row schema",
+  "description": "The shared trade-log row schema frozen by Phase 1 item #2 (multi-leg ledger) and item #3 (per-leg cost decomposition). Every backtest in this framework, and every cross-language port (`quant-research-framework-rs`), emits per-leg rows in this 14-column form. Downstream consumers (REPO 2 quant-mm-simulator + quant-mm-simulator-rs, the strategy-pnl-daily-rs ETL, the verification gate logs) read this contract and nothing else; new fields can be added in v2 only as additive tail columns to preserve byte-for-byte parity of legacy 7-tuple loaders.\n\nReferences: backtester/ledger.py (Python source of truth) and src/lib.rs Trade struct (Rust mirror) at tag v0.7.0-pairs-carry. The kernel-emitted 9-tuple is a strict prefix of this 14-tuple; the 5 cost-decomposition fields trail at the end so that legacy 7-tuple and 9-tuple consumers continue to parse correctly via aggregate_legs.",
   "type": "object",
   "required": [
     "side", "entry_idx", "exit_idx",
@@ -52,7 +52,7 @@
     "trade_group_id": {
       "type": "integer",
       "minimum": 0,
-      "description": "Joint-trade identifier. All legs of one logical trade share the same group_id. Single-leg single-asset runs use the kernel's row index here so each leg is its own group — preserving v0.4.0 byte-level CSV equivalence."
+      "description": "Joint-trade identifier. All legs of one logical trade share the same group_id. Single-leg single-asset runs use the kernel's row index here so each leg is its own group, preserving v0.4.0 byte-level CSV equivalence."
     },
     "fee": {
       "type": "number",

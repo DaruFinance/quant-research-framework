@@ -21,7 +21,7 @@ returns window strictly preceding the rebalance bar.
 The output of ``neutralize`` is always a real-valued NumPy array of
 the same length as the input. Sign convention is preserved (positive
 weights stay positive, negative stay negative) unless the
-neutralization explicitly requires a sign flip — which is documented
+neutralization explicitly requires a sign flip, which is documented
 on the relevant mode.
 """
 from __future__ import annotations
@@ -179,10 +179,10 @@ def neutralize(
     """Dispatch to one of the three neutralizers.
 
     ``mode``:
-        ``"dollar"`` — no auxiliary input required.
-        ``"beta"``   — pass ``betas`` (array of length n_assets) and
+        ``"dollar"``, no auxiliary input required.
+        ``"beta"``, pass ``betas`` (array of length n_assets) and
                        optionally ``market_idx``.
-        ``"sigma"``  — pass ``vols`` (array of length n_assets).
+        ``"sigma"``, pass ``vols`` (array of length n_assets).
     """
     if mode == "dollar":
         return _dollar_neutralize(raw_weights)

@@ -3,15 +3,15 @@
 
 Outputs (committed alongside this script under ``tests/fixtures/``):
 
-- ``pair_btc_eth_1h_1500.parquet`` — 1500 1h bars of BTCUSDT + ETHUSDT
+- ``pair_btc_eth_1h_1500.parquet``: 1500 1h bars of BTCUSDT + ETHUSDT
   from a window where the log-ratio is cointegrating (ADF p < 0.05).
-- ``funding_btcusdt_200evt.parquet`` — 200 8h funding events from
+- ``funding_btcusdt_200evt.parquet``: 200 8h funding events from
   Binance USDⓈ-M perpetual history.
-- ``oi_btc_perp_1h_7d.parquet`` — 7 days of 1h BTC perp open interest
+- ``oi_btc_perp_1h_7d.parquet``: 7 days of 1h BTC perp open interest
   from Binance futures.
-- ``basis_btc_perp_spot_1d.parquet`` — 1 day of 1h basis bp (perp -
+- ``basis_btc_perp_spot_1d.parquet``: 1 day of 1h basis bp (perp -
   spot) for BTC.
-- ``onchain_nvt_50d.csv`` — 50 daily NVT readings derived from
+- ``onchain_nvt_50d.csv``: 50 daily NVT readings derived from
   blockchain.info free public stats endpoints (no API key).
 
 Run from the repo root:

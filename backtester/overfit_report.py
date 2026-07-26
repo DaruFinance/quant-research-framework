@@ -10,16 +10,16 @@ Every line begins with a two-space indent and a distinct prefix
 ``| Trades: ... ROI: ... PF: ... Shp: ... Win: ...% Exp: ... MaxDD:``
 metric body that ``parity_common.LINE_RE`` matches, so ``parse_metrics``
 ignores them and the existing parity harnesses stay byte-identical. (The
-indent alone does NOT protect them — LINE_RE starts with ^\\s* — the
+indent alone does NOT protect them (LINE_RE starts with ^\\s*), so the
 absence of the Trades: body does. Enforced by tools/parity_overfit_lines.py.)
 This module is invoked only when the ``OVERFIT_REPORT`` flag is on.
 
-CRITICAL — effective trials. ``trial_sharpes`` MUST be the distinct
+CRITICAL, effective trials. ``trial_sharpes`` MUST be the distinct
 strategies tried in ONE in-sample optimisation (the distinct lookbacks
 evaluated by ``_optimiser_impl``), NOT a concatenation across WFO
 windows. ``len(trial_sharpes)`` is the trial count N for DSR/PSR/MinTRL.
 
-CRITICAL — Sharpe convention (Lens B D2/D6). DSR/PSR/MinTRL require the
+CRITICAL, Sharpe convention (Lens B D2/D6). DSR/PSR/MinTRL require the
 non-annualised per-observation estimator sqrt(T)*mean/std. The CHOSEN
 Sharpe is recomputed HERE from ``oos_returns`` in that convention; it is
 NOT taken from the engine's met_is['Sharpe'] (in-sample, possibly

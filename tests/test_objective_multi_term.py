@@ -95,8 +95,8 @@ def test_multi_term_returns_score_within_finite_range():
 
 
 def test_multi_term_penalises_high_correlation_to_benchmark():
-    """Two equivalent strategies — one uncorrelated to benchmark,
-    one ~perfectly correlated — produce different scores; the
+    """Two equivalent strategies, one uncorrelated to benchmark,
+    one ~perfectly correlated, produce different scores; the
     correlated one is lower."""
     rng = np.random.default_rng(seed=5)
     bench = rng.normal(0.001, 0.01, 500)
@@ -175,13 +175,13 @@ def test_multi_term_caller_responsible_for_slicing():
     safety net that catches the most common misuse."""
     obj = multi_term()
     r = np.zeros(200)  # IS slice of length 200
-    full_bench = np.zeros(1000)  # full series — caller forgot to slice
+    full_bench = np.zeros(1000)  # full series, caller forgot to slice
     with pytest.raises(ValueError, match="benchmark length"):
         obj(r, benchmark_rets=full_bench)
 
 
 # ---------------------------------------------------------------------------
-# G3 — 5 IS windows hand-reconciled
+# G3: 5 IS windows hand-reconciled
 # ---------------------------------------------------------------------------
 def test_multi_term_5_is_windows_hand_reconcilable():
     """For each of 5 IS-window endpoints, the multi_term score must

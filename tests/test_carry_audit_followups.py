@@ -3,7 +3,7 @@
 These pin behaviours that the original Phase 3 commit (ff09ab6) had
 either covered loosely, by accident, or only in one direction.  The
 re-audit pass produced this file as part of the handoff between the
-Python build session and the Rust port session — every test here is
+Python build session and the Rust port session, every test here is
 a regression pin; none expect a code change in the carry source.
 
 Order roughly matches the 10-item checklist in
@@ -50,7 +50,7 @@ ONCHAIN_FIX = HERE / "fixtures" / "onchain_nvt_50d.csv"
 def test_momentum_smallest_valid_window():
     """At exactly ``len(rates) == window + 1``, the trailing slice
     must be exactly ``window`` rows and the test value must be
-    ``rates[-1]`` — not off-by-one in either direction."""
+    ``rates[-1]``, not off-by-one in either direction."""
     window = 5
     rates = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])  # len = window+1
     df = pd.DataFrame({"time": np.arange(len(rates)) * FUNDING_INTERVAL_S,
@@ -121,19 +121,19 @@ def test_load_funding_shift_by_full_interval_passes(tmp_path):
 def test_onchain_attrs_dropped_by_concat_with_foreign_frame():
     """Pandas drops attrs whenever it concats a frame whose attrs
     don't match the source.  This is the realistic case: joining
-    on-chain rows with bar data (no carry attrs) — the result loses
+    on-chain rows with bar data (no carry attrs), the result loses
     ``snapshot_sha256`` silently."""
     df = load_onchain(ONCHAIN_FIX, metric="nvt")
     sha_at_load = df.attrs.get("snapshot_sha256")
     assert sha_at_load is not None  # set at load time
 
-    # Foreign frame with no carry-loader attrs — like a bar-data row.
+    # Foreign frame with no carry-loader attrs: like a bar-data row.
     foreign = pd.DataFrame({"time": [0], "value": [0.0]})
     joined = pd.concat([df, foreign], ignore_index=True)
 
     assert joined.attrs.get("snapshot_sha256") is None, (
         "pandas now propagates attrs across concat with a foreign "
-        "frame — update load_onchain docstring and consumer code"
+        "frame, update load_onchain docstring and consumer code"
     )
 
     # The recommended consumer pattern: capture once at load time.
@@ -143,8 +143,8 @@ def test_onchain_attrs_dropped_by_concat_with_foreign_frame():
 
 
 def test_carry_loaders_attrs_dropped_by_merge_with_bar_data():
-    """The realistic join — merging carry rows with bar data on a
-    timestamp column — drops the carry-loader attrs.  Pin this for
+    """The realistic join, merging carry rows with bar data on a
+    timestamp column, drops the carry-loader attrs.  Pin this for
     each of the four loaders so a pandas-version regression that
     silently changes it is caught."""
     f = load_funding(FUNDING_FIX)
@@ -171,7 +171,7 @@ def test_carry_loaders_attrs_dropped_by_merge_with_bar_data():
 def test_carry_loaders_attrs_survive_self_concat():
     """Counter-pin: pandas DOES preserve attrs when both sides of a
     concat share identical attrs (the typical 'append more rows from
-    the same source' pattern).  This is a documentary test — neither
+    the same source' pattern).  This is a documentary test, neither
     side of the user-facing API depends on it; it just makes the
     boundary explicit so the warning in load_onchain is precise."""
     f = load_funding(FUNDING_FIX)
@@ -184,11 +184,11 @@ def test_carry_loaders_attrs_survive_self_concat():
 # FundingOICointegrationModel with OI cadence > funding cadence.
 # Multiple funding events must legitimately map to the same most-recent
 # OI value; o_sd may be 0 if no new OI arrived in the window, in which
-# case the model returns flat — that's the documented short-circuit.
+# case the model returns flat: that's the documented short-circuit.
 # --------------------------------------------------------------------- #
 
 def test_oi_cointegration_with_slower_oi_cadence():
-    # Funding at 8h cadence, OI at 24h cadence — every third funding
+    # Funding at 8h cadence, OI at 24h cadence: every third funding
     # event sees a new OI value, the rest reuse the prior.
     window = 6
     f_times = np.arange(window + 1) * FUNDING_INTERVAL_S          # 7 events
@@ -203,7 +203,7 @@ def test_oi_cointegration_with_slower_oi_cadence():
         funding, oi, int(f_times[-1]))
     # The mapping must succeed (no LookupError), the resulting signal
     # is well-typed, and the direction is one of {-1, 0, 1}.  We don't
-    # pin a specific direction here — just no leak / no crash.
+    # pin a specific direction here: just no leak / no crash.
     assert sig.direction in {-1, 0, 1}
     # Strength must be finite and non-negative.
     assert np.isfinite(sig.strength)

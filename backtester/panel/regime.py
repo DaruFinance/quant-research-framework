@@ -15,7 +15,7 @@ ship by default; either may be plugged into the orchestrator via
 
 - ``detect_regimes_panel_per_asset`` (the registered default):
   each asset's regime is computed from its own close series only.
-  Trivially leak-free across assets — no cross-asset coupling.
+  Trivially leak-free across assets, no cross-asset coupling.
 - ``detect_regimes_panel_market(market_asset='BTC')``: every asset
   inherits ``market_asset``'s regime label at each bar. The
   classic "BTC dominance" regime. Leak-free because the market

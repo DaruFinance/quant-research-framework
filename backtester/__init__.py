@@ -30,7 +30,7 @@ from numba.typed import List
 
 # Configuration
 # CSV_FILE can be overridden without editing this file by setting the BT_CSV
-# environment variable — handy when running a strategy example from examples/.
+# environment variable: handy when running a strategy example from examples/.
 CSV_FILE            = os.environ.get("BT_CSV", "data/your_ohlc.csv") # <-- put your CSV here (not included in repo)
 
 ACCOUNT_SIZE        = 100_000.0      # total account equity in USD
@@ -84,7 +84,7 @@ CONFLUENCES: str | None = None        # "RSIge50", "Pge0.8", ...
 MASK_EXITS = False        # confluence filter: when False (default), the
                           # confluence rule applies only to entries (codes 1, 3);
                           # exit codes (2, 4) pass through unconditionally.
-                          # When True, the rule applies to exits too — useful for
+                          # When True, the rule applies to exits too: useful for
                           # strategies where exit signals also need confirmation.
 
 LEGACY_SIDE_BUG = False   # RRR-optimisation side comparison: the original
@@ -211,7 +211,7 @@ FAST_EMA_SPAN = 20
 # in pip-install / library workflows that never read CSVs.
 
 # ============================================================================
-# Config dataclass — v0.4.0 library-grade configuration surface.
+# Config dataclass: v0.4.0 library-grade configuration surface.
 #
 # Background: prior to v0.4.0 every tunable lived as a module-level UPPERCASE
 # constant (FEE_PCT, USE_TP, FOREX_MODE, ...). The engine read those constants
@@ -415,7 +415,7 @@ class Config:
 
         Returns the previous values as a dict, so callers can restore them
         via `restore_module_state(prev)`. Use `with_config(cfg)` instead of
-        calling this directly when possible — the context manager guarantees
+        calling this directly when possible, the context manager guarantees
         restore on exception.
 
         The derived `dd_constraint` and any forex-mode-driven overrides
@@ -508,8 +508,8 @@ def with_config(cfg: Optional[Config]):
 # live as bare module globals (`last_unfiltered_raw`, `_last_df`, ...).
 # By storing them in a dict we can mutate without `global` declarations
 # and we keep a single audit point should we ever want to make these
-# per-call (e.g. truly fork-safe). Today they remain process-global —
-# matching the prior contract — but the surface is cleaner.
+# per-call (e.g. truly fork-safe). Today they remain process-global :
+# matching the prior contract: but the surface is cleaner.
 # ----------------------------------------------------------------------
 _runtime_state: dict[str, Any] = {
     'last_unfiltered_raw': None,
@@ -1021,7 +1021,7 @@ def parse_signals(raw: np.ndarray, times: pd.Series) -> np.ndarray:
 
         # Optional symmetric exit-side filter. When MASK_EXITS is True the
         # confluence rule applies to exit codes (2 = long-close, 4 = short-close)
-        # too — the bar must satisfy the confluence (codes != 0) for the exit
+        # too: the bar must satisfy the confluence (codes != 0) for the exit
         # to fire. This is desirable for strategies whose exits also need
         # confirmation (e.g. only close on a confirming candle); the default
         # (False) preserves the v0.2.x behaviour where exits are unconditional
@@ -1077,7 +1077,7 @@ def detect_regimes(df: pd.DataFrame) -> pd.Series:
 
     Custom detectors must:
       * Return labels that are a subset of `REGIME_LABELS` (length 2..5)
-      * Be free of look-ahead — only use information available at bar i-1 or
+      * Be free of look-ahead: only use information available at bar i-1 or
         earlier when labelling bar i.
 
     The ``@registers_invariant`` decorator auto-registers this
@@ -1118,7 +1118,7 @@ def evaluate_filters(trades, rets, regimes=None):
     module-level *blocked_* structures according to:
          TradeCount > 50  and  PF < 1    block
     """
-    # Was: `global blocked_regimes, ...` — but those names are mutated
+    # Was: `global blocked_regimes, ...`: but those names are mutated
     # in-place via .clear()/.add()/.setdefault(), no rebind, so the
     # `global` keyword was redundant. Removed in v0.4.0.
     blocked_regimes.clear()
@@ -1453,7 +1453,7 @@ def _backtest_numba_core(o, h, l, c, sig,
             continue
 
         # forced exit for session end. v0.2.3 fix: drop the prior
-        # `and code != 0` guard — the force-close should fire whenever an
+        # `and code != 0` guard: the force-close should fire whenever an
         # open position exists at a session-end bar, regardless of whether
         # the strategy happens to emit a signal on that same bar.
         # Prior behaviour silently carried positions across out-of-session
@@ -1761,7 +1761,7 @@ def _backtest_numba_core(o, h, l, c, sig,
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
         # cost decomposition (force-close on last bar; no
-        # funding_acc reset needed — kernel returns shortly after).
+        # funding_acc reset needed: kernel returns shortly after).
         fee_v, slip_v, fund_v, gross_v = _decompose_costs(
             open_pos, entry_price, exit_price, qty,
             fee_entry, fee_exit, funding_acc, slip,
@@ -1951,7 +1951,7 @@ def optimiser(df, lb_range, metric, min_trades, config: Optional[Config] = None)
 
     `config` is optional. When provided, the engine uses cfg's values for
     the duration of this call (and restores prior values on exit). When
-    omitted, the call reads from module globals as it always has —
+    omitted, the call reads from module globals as it always has ,
     the documented `bt.X = Y` / `monkeypatch.setattr(bt, "X", Y)` API
     keeps working unchanged.
     """
@@ -2106,7 +2106,7 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
     # --- item #3 opt-in side-channel: capture the distinct trial Sharpes ---
     # eval_cache maps each EVALUATED lookback -> (val, lb, met). The set of
     # distinct lookbacks IS the "strategies tried" set for this single IS
-    # optimisation — window-count-free (effective-trials discipline). Pure
+    # optimisation: window-count-free (effective-trials discipline). Pure
     # write to the scratch dict; no return value, printed line, or
     # control-flow change. Gated so default runs are inert.
     if OVERFIT_REPORT:
@@ -2702,7 +2702,7 @@ def classic_single_run(df, config: Optional[Config] = None):
 
 
 def _classic_single_run_impl(df):
-    # Was: `global TP_PERCENTAGE, USE_TP, signals_cache` — redundant.
+    # Was: `global TP_PERCENTAGE, USE_TP, signals_cache`: redundant.
     # TP/USE_TP rebinds inside this function are done via `globals()['X']=...`
     # (the only path that the engine respects when reading them back through
     # `backtest()` -> `_backtest_numba_core`); signals_cache is mutated
@@ -3067,7 +3067,7 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
     If `best_lbs` is given (regime-segmentation mode), the active LB rotates per
     bar according to `regimes_is` / `regimes_oos`. Otherwise a single `lb` is
     used for the whole window. The WFO walk cadence (window boundaries) is
-    decided by the caller and is *not* affected by regime changes — only the
+    decided by the caller and is *not* affected by regime changes, only the
     per-bar choice of LB inside the window changes.
     """
     use_regime = best_lbs is not None
@@ -3799,7 +3799,7 @@ def main(config: Optional[Config] = None):
     exit). Pass `bt.Config()` to use library defaults regardless of the
     current module state, or `bt.Config.from_module()` to snapshot the
     current state and tweak fields. When omitted, reads from module
-    globals — the legacy `bt.X = Y` API works exactly as before.
+    globals, the legacy `bt.X = Y` API works exactly as before.
     """
     with with_config(config):
         return _main_impl()

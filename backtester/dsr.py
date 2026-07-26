@@ -33,7 +33,7 @@ Public API:
 Returns the DSR (a probability). Reject the null SR_true <= 0 at
 1 - alpha if DSR > 1 - alpha.
 
-This module is a *post-processing* utility — it does not run inside
+This module is a *post-processing* utility, it does not run inside
 the engine and does not affect cross-language parity. The Rust
 mirror is on the v0.4.0 roadmap.
 """
@@ -94,7 +94,7 @@ def deflated_sharpe_ratio(
     #     g_4 = E[(x - mu)^4] / sigma^4
     # so g_4 = 3 for a Normal distribution (NOT excess kurtosis g_4 - 3).
     # The (g_4 - 1) coefficient in the formula is therefore correct as
-    # written below — it reduces to (3 - 1) / 4 = 0.5 in the Normal case,
+    # written below: it reduces to (3 - 1) / 4 = 0.5 in the Normal case,
     # exactly as derived in Bailey-LdP §3.
     denom_sq = _sr_std_correction(rets, sharpe_chosen)
     if denom_sq is None:

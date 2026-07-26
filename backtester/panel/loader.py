@@ -18,7 +18,7 @@ contract:
 
 The loader is pure data-only: it reads CSVs, computes the intersection,
 and emits a Dataset. No time-dependent decisions, no forward-looking
-inputs — trivially lookahead-free.
+inputs, trivially lookahead-free.
 """
 from __future__ import annotations
 

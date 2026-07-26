@@ -2,7 +2,7 @@
 
 These tests import each example module and call its strategy /
 regime function on a small synthetic OHLC frame. They do NOT verify
-metric correctness — they verify only that:
+metric correctness, they verify only that:
   - the module imports cleanly (sklearn pipeline builds);
   - the strategy function obeys the (df, lb) -> int8[n] contract;
   - the regime detector returns a Series of allowed labels indexed
@@ -48,7 +48,7 @@ def _import_example(rel_path: str):
     return mod
 
 
-# Keep the original engine globals so we restore them after each test —
+# Keep the original engine globals so we restore them after each test :
 # the example modules patch bt.create_raw_signals / detect_regimes /
 # REGIME_LABELS / OOS_CANDLES on import.
 @pytest.fixture(autouse=True)
