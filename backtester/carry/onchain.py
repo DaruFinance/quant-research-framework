@@ -1,4 +1,4 @@
-"""On-chain stream loader with snapshot-pinning (item #41, Phase 3).
+"""On-chain stream loader with snapshot-pinning (Phase 3).
 
 The critical property here is *snapshot pinning*: on-chain providers
 (Glassnode, CryptoQuant, blockchain.info) frequently revise historical

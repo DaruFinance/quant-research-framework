@@ -1,9 +1,8 @@
 """Invariant-test framework for lookahead-free declarations.
 
-Item #14 of the v2 extension plan: a registry-driven pollute-and-verify
-harness so every new state-bearing function (regime detectors, spread
-estimators, screeners, quoters in items #4, #9, #10, #11, #21, …)
-gets a no-look-ahead property test automatically.
+A registry-driven pollute-and-verify harness, so that every new
+state-bearing function (regime detectors, spread estimators, screeners,
+quoters) gets a no-look-ahead property test automatically.
 
 Usage
 -----

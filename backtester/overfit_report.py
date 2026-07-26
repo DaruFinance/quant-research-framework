@@ -1,4 +1,4 @@
-"""Opt-in overfitting-statistics report block (item #3, part C).
+"""Opt-in overfitting-statistics report block (part C).
 
 Emits additive stdout lines: Deflated Sharpe (DSR), Probabilistic Sharpe
 (PSR), Probability of Backtest Overfitting (PBO), Minimum Track-Record

@@ -1,4 +1,4 @@
-"""Tests for the pair / spread screener (item #9, Phase 3 — HIGH-RISK)."""
+"""Tests for the pair / spread screener (Phase 3 — HIGH-RISK)."""
 from __future__ import annotations
 
 from pathlib import Path

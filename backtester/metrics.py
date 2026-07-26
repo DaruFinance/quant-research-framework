@@ -1,4 +1,4 @@
-"""Extra metric primitives (item #44, Phase 2).
+"""Extra metric primitives (Phase 2).
 
 The single-asset kernel emits a fixed 8-metric tuple (Trades, ROI,
 PF, WinRate, Exp, Sharpe, MaxDD, Consistency). This module adds

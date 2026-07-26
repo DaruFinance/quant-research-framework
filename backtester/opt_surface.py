@@ -1,4 +1,4 @@
-"""Item #1 — IS parameter-robustness isosurface: dense in-sample objective grid
+"""IS parameter-robustness isosurface: dense in-sample objective grid
 emit. OPT-IN, parity-safe.
 
 Re-implements the optimiser's per-cell evaluate math (__init__.py:1697-1776

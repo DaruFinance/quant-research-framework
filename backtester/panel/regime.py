@@ -1,4 +1,4 @@
-"""Cross-asset regime detection (item #4, Phase 2; HIGH-RISK).
+"""Cross-asset regime detection (Phase 2; HIGH-RISK).
 
 The single-asset ``detect_regimes(df)`` lives in
 ``backtester/__init__.py`` and uses EMA-200 + 8-bar consistency to

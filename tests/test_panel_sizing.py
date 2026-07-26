@@ -1,4 +1,4 @@
-"""Tests for the ERC sizing primitive (item #6, Phase 2)."""
+"""Tests for the ERC sizing primitive (Phase 2)."""
 from __future__ import annotations
 
 from pathlib import Path

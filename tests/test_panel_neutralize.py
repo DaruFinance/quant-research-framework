@@ -1,4 +1,4 @@
-"""Tests for the neutralization primitives (item #7, Phase 2)."""
+"""Tests for the neutralization primitives (Phase 2)."""
 from __future__ import annotations
 
 from pathlib import Path

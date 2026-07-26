@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Item #1 renderer — interactive 3D iso-Sharpe isosurface (3-axis) OR lookback
+"""renderer — interactive 3D iso-Sharpe isosurface (3-axis) OR lookback
 robustness ridge (2-axis) + 2D heatmap slices + per-window robustness score for
 the IN-SAMPLE objective landscape. Engine-agnostic; reads opt_surface.{csv,
 parquet} (sibling of trade_list.csv).

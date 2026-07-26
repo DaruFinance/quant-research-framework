@@ -1,4 +1,4 @@
-"""Tests for the long-short basket primitive (item #8, Phase 2)."""
+"""Tests for the long-short basket primitive (Phase 2)."""
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Volume strategy family (item #2, v0.5.0 Python). Python mirrors of the four
+"""Volume strategy family (v0.5.0 Python). Python mirrors of the four
 Rust volume examples. Each is a `create_raw_signals`-shaped function:
 (df, lb) -> int8 array of -1/0/+1. No look-ahead: every signal at index i uses
 only data evaluated at bar i-1 (and earlier).

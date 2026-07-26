@@ -1,4 +1,4 @@
-"""Tests for the walk-forward orchestrator dispatch table (item #5).
+"""Tests for the walk-forward orchestrator dispatch table.
 
 Pure routing layer — the registered functions retain their original
 lookahead-leak and parity guarantees, and these tests assert only that

@@ -1,4 +1,4 @@
-"""Funding-signal model library (item #43, Phase 3).
+"""Funding-signal model library (Phase 3).
 
 Each model exposes a ``signal_at(funding_df, t_s, **kw) -> SignalEmission``
 contract.  The emission is a directional decision (``+1``/``0``/``-1``)

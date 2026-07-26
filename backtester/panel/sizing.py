@@ -1,4 +1,4 @@
-"""Portfolio sizing primitives (item #6, Phase 2).
+"""Portfolio sizing primitives (Phase 2).
 
 Currently exposes:
 

@@ -1,4 +1,4 @@
-"""Pre-screening eligibility filters (item #13, Phase 3).
+"""Pre-screening eligibility filters (Phase 3).
 
 Quick acceptance tests applied to a candidate spread before any
 trading decision:

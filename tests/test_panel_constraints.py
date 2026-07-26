@@ -1,4 +1,4 @@
-"""Tests for portfolio-level constraints (item #45, Phase 2)."""
+"""Tests for portfolio-level constraints (Phase 2)."""
 from __future__ import annotations
 
 import numpy as np

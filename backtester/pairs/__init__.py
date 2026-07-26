@@ -1,7 +1,7 @@
 """Pairs / stat-arb plugin (Phase 3 items #9, #10, #11, #12, #13).
 
 Optional package. Pulled via ``pip install quant-research-framework[pairs]``.
-Builds on the panel substrate (item #1) to expose:
+Builds on the panel substrate to expose:
 
 - Spread-definition primitives (log-ratio, OLS-residual, Kalman β,
   PCA-residual, ML-residual) — item #10.

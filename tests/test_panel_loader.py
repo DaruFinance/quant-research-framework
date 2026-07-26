@@ -1,4 +1,4 @@
-"""Tests for the panel data loader (item #1, Phase 2).
+"""Tests for the panel data loader (Phase 2).
 
 Verification gates:
 
@@ -184,7 +184,7 @@ def test_empty_paths_dict_raises():
 
 
 # ---------------------------------------------------------------------------
-# Item #4: cross-asset regime detector lookahead leak harness (HIGH-RISK).
+# cross-asset regime detector lookahead leak harness (HIGH-RISK).
 # For every (victim, witness) pair and every T in a 50-point grid, polluting
 # `victim`'s data at rows > T must leave `witness`'s regime labels at
 # rows <= T bit-identical. Both default detectors are leak-free by

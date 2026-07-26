@@ -1,4 +1,4 @@
-"""Spread-aware stop-loss families (item #12, Phase 3).
+"""Spread-aware stop-loss families (Phase 3).
 
 Three stop primitives for pairs strategies:
 

@@ -1,4 +1,4 @@
-"""Pair / spread screener (item #9, Phase 3 — HIGH-RISK).
+"""Pair / spread screener (Phase 3 — HIGH-RISK).
 
 Given a panel and a screening window ending at ``t_idx``, evaluate
 every pair `(a, b)` of assets with one of the supported methods and

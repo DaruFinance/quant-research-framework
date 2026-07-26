@@ -1,4 +1,4 @@
-"""Tests for the multi-term IS objective (item #44, HIGH-RISK)."""
+"""Tests for the multi-term IS objective (HIGH-RISK)."""
 from __future__ import annotations
 
 from pathlib import Path

@@ -45,7 +45,7 @@ SESSION_START   = "8:00"            # NY open time (HH:MM)
 SESSION_END     = "16:50"            # NY close time (HH:MM)
 NY_TZ           = pytz.timezone("America/New_York")
 
-# Item #46: maximum hold period in bars. 0 = no force-close (engine
+# maximum hold period in bars. 0 = no force-close (engine
 # behaves as pre-#46). When > 0, the kernel emits a code-2/4 close at
 # bar i for any open position with (i - ent_bar) >= MAX_HOLD_BARS.
 # Priority: news/session > hold-period > SL/TP intrabar > signal-driven.
@@ -139,7 +139,7 @@ USE_WFO             = True                       # do rolling windows?
 WFO_TRIGGER_MODE    = "candles"                   # "candles" or "trades"
 WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per window
 
-# Overfitting-statistics report (item #3). OFF by default: when on, an
+# Overfitting-statistics report. OFF by default: when on, an
 # ADDITIVE block (DSR/PSR/PBO/MinTRL/MinBTL/haircut) is printed after the
 # walk-forward run. The block's lines never carry the metric body
 # parity_common.LINE_RE matches, so existing parity harnesses stay
@@ -321,7 +321,7 @@ class Config:
     wfo_trigger_mode: str = "candles"
     wfo_trigger_val: int = 5000
 
-    # Overfitting-statistics report (item #3); default OFF.
+    # Overfitting-statistics report; default OFF.
     overfit_report: bool = False
 
     # ---- item #1 (IS isosurface emit) ----
@@ -620,7 +620,7 @@ def _safe_append_or_write_trade_csv(df_export: pd.DataFrame, path: str, write_he
 
 def _metrics_from_trades(trades):
     # 1) per-trade returns in R-units vs USD
-    # Item #2: trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
+    # trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
     # leg_id, tgid). pnl is at index 6; do not use *_, pnl which would
     # capture tgid as pnl. Indexing by [6] is robust to future widening.
     if FOREX_MODE:
@@ -1080,7 +1080,7 @@ def detect_regimes(df: pd.DataFrame) -> pd.Series:
       * Be free of look-ahead — only use information available at bar i-1 or
         earlier when labelling bar i.
 
-    The ``@registers_invariant`` decorator (item #14) auto-registers this
+    The ``@registers_invariant`` decorator auto-registers this
     function with the lookahead-leak harness so its claim of lookahead
     freeness is property-tested every CI run. Custom detectors plugged in
     via ``bt.detect_regimes = my_detector`` should also be decorated to
@@ -1311,7 +1311,7 @@ def _five_segment_sums(vec):
 def _decompose_costs(side_val, entry_price, exit_price, qty,
                      fee_entry, fee_exit, funding_acc, slip,
                      use_forex, pnl):
-    """Item #3 cost decomposition for a single trade leg.
+    """cost decomposition for a single trade leg.
 
     Returns (fee, slippage, funding, gross_pnl) such that:
         gross_pnl - fee - slippage - funding == pnl   (to fp tolerance)
@@ -1393,13 +1393,13 @@ def _backtest_numba_core(o, h, l, c, sig,
     trades_xp    = List.empty_list(types.float64)     #  exit price
     trades_qty   = List.empty_list(types.float64)     #  quantity
     trades_pnl   = List.empty_list(types.float64)     #  pnl
-    # Item #2: per-leg metadata. Single-leg single-asset mode emits
+    # per-leg metadata. Single-leg single-asset mode emits
     # leg_id=0 and trade_group_id=row_index, so downstream aggregation
     # via backtester.ledger.aggregate_legs is uniform across single- and
     # multi-leg trades. Metric output stays bit-identical to v0.4.0.
     trades_leg_id = List.empty_list(types.int32)
     trades_tgid   = List.empty_list(types.int64)
-    # Item #3: cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
+    # cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
     # slippage = qty*slip*(raw_entry+raw_exit) recovered from slipped
     # prices via entry_price/(1+slip) for long entries (and the obvious
     # mirror for shorts); funding = funding_acc accrued during the
@@ -1463,7 +1463,7 @@ def _backtest_numba_core(o, h, l, c, sig,
         if open_pos != 0:
             if use_sessions and end_bar_flag:
                 code = 2 if open_pos == 1 else 4
-            # Item #46: hold-period force-close. Pure index arithmetic
+            # hold-period force-close. Pure index arithmetic
             # (idx and ent_bar are both at or before this bar), so
             # lookahead-free by construction. Only fires if session
             # didn't already set code via the elif chain semantics.
@@ -1513,7 +1513,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                 else:
                     pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                           - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition BEFORE funding_acc reset so
+                # cost decomposition BEFORE funding_acc reset so
                 # the helper sees the funding actually paid on this leg.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     open_pos, entry_price, exit_price, qty,
@@ -1568,7 +1568,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                              fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition.
+                # cost decomposition.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     -1, entry_price, exit_price, qty,
                     fee_entry, fee_exit, funding_acc, slip,
@@ -1621,7 +1621,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                              fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition.
+                # cost decomposition.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     1, entry_price, exit_price, qty,
                     fee_entry, fee_exit, funding_acc, slip,
@@ -1671,7 +1671,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                          fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
-            # Item #3: cost decomposition.
+            # cost decomposition.
             fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                 1, entry_price, exit_price, qty,
                 fee_entry, fee_exit, funding_acc, slip,
@@ -1714,7 +1714,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                          fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
-            # Item #3: cost decomposition.
+            # cost decomposition.
             fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                 -1, entry_price, exit_price, qty,
                 fee_entry, fee_exit, funding_acc, slip,
@@ -1760,7 +1760,7 @@ def _backtest_numba_core(o, h, l, c, sig,
         else:
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
-        # Item #3: cost decomposition (force-close on last bar; no
+        # cost decomposition (force-close on last bar; no
         # funding_acc reset needed — kernel returns shortly after).
         fee_v, slip_v, fund_v, gross_v = _decompose_costs(
             open_pos, entry_price, exit_price, qty,
@@ -1793,7 +1793,7 @@ def _backtest_numba_core(o, h, l, c, sig,
     pnl    = np.asarray(trades_pnl,   dtype=np.float64)
     legid  = np.asarray(trades_leg_id, dtype=np.int32)
     tgid   = np.asarray(trades_tgid,   dtype=np.int64)
-    # Item #3: cost decomposition arrays.
+    # cost decomposition arrays.
     fees_arr  = np.asarray(trades_fee,     dtype=np.float64)
     slips_arr = np.asarray(trades_slip,    dtype=np.float64)
     funds_arr = np.asarray(trades_funding, dtype=np.float64)
@@ -2303,7 +2303,7 @@ def export_trades(trades, df, strat, window, sample, path, write_header):
     t, o, h, l, c = (df[x].values for x in ('time','open','high','low','close'))
     rows = []
     for trade in trades:
-        # Item #2: trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
+        # trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
         # *_ swallows the trailing leg metadata; the CSV schema stays at
         # 15 columns so parity_ledger.py keeps working unchanged.
         side, ei, xi, _entry_price, _exit_price, _qty, pnl, *_ = trade
@@ -2887,7 +2887,7 @@ def _classic_single_run_impl(df):
     # ---------- CASE B  classic optimisation (no regime segment) ----------
     best_lb, met_is_opt = optimiser(is_df, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
 
-    # Item #1: emit the baseline IS objective surface (opt-in, default off).
+    # emit the baseline IS objective surface (opt-in, default off).
     if EMIT_OPT_SURFACE:
         import backtester as _bt2
         from backtester import opt_surface as _osf
@@ -2976,7 +2976,7 @@ def _classic_single_run_impl(df):
             trades_all = tr_is_opt + tr_oos_opt
 
             # 3.b) extract pnl from each trade tuple
-            # Item #2: pnl is at index 6; the 9-tuple's last element is
+            # pnl is at index 6; the 9-tuple's last element is
             # tgid (row index), so trade[-1] would break the cumsum.
             pnl_list = [trade[6] for trade in trades_all]
 
@@ -3420,7 +3420,7 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
     return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
 
 
-# Register Phase 1 single-asset orchestrator routes (item #5). Each entry
+# Register Phase 1 single-asset orchestrator routes. Each entry
 # wraps one of the two original _walk_forward_impl branches verbatim;
 # adding new entries (multi_asset=True, multi_leg=True, ...) is the
 # extension point for Phases 2-5.

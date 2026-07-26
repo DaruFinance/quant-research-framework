@@ -196,9 +196,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sphinx-build -W -b html` which converts the six pandas-style
   docstring warnings (under `evaluate_filters`,
   `optimize_regimes_sequential`, `backtester/dsr.py`) into errors,
-  so `gh-pages` never published. Dropped `-W` and added
-  `docs/TODO.md` listing the warnings for follow-up cleanup. Once
-  TODO.md is empty, re-add `-W` to enforce the docstring discipline.
+  so `gh-pages` never published. Dropped `-W` pending a docstring
+  cleanup; re-add it once the warnings are gone to enforce the
+  docstring discipline.
 
 ## [0.3.0] — 2026-05-03  (paper-v2 retag)
 

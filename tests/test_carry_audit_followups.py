@@ -44,7 +44,7 @@ ONCHAIN_FIX = HERE / "fixtures" / "onchain_nvt_50d.csv"
 
 
 # --------------------------------------------------------------------- #
-# Item #2 — FundingMomentumModel smallest-valid window arithmetic.
+# FundingMomentumModel smallest-valid window arithmetic.
 # --------------------------------------------------------------------- #
 
 def test_momentum_smallest_valid_window():
@@ -77,7 +77,7 @@ def test_momentum_one_below_window_returns_flat():
 
 
 # --------------------------------------------------------------------- #
-# Item #3 — BasisBlowoutTrigger silent-skip on zero/non-finite sigma.
+# BasisBlowoutTrigger silent-skip on zero/non-finite sigma.
 # --------------------------------------------------------------------- #
 
 def test_basis_blowout_skips_zero_sigma_window():
@@ -96,7 +96,7 @@ def test_basis_blowout_skips_zero_sigma_window():
 
 
 # --------------------------------------------------------------------- #
-# Item #4 — load_funding positive control: shift by an integer multiple
+# load_funding positive control: shift by an integer multiple
 # of FUNDING_INTERVAL_S keeps every row aligned and must NOT raise.
 # --------------------------------------------------------------------- #
 
@@ -112,7 +112,7 @@ def test_load_funding_shift_by_full_interval_passes(tmp_path):
 
 
 # --------------------------------------------------------------------- #
-# Items #6 / #9 — snapshot pinning attrs do NOT survive a downstream
+# snapshot pinning attrs do NOT survive a downstream
 # concat.  Pin the behaviour so a future pandas upgrade / refactor that
 # silently changes it can't slip through.  The docstring on
 # ``load_onchain`` warns about this; this test is the regression pin.
@@ -181,7 +181,7 @@ def test_carry_loaders_attrs_survive_self_concat():
 
 
 # --------------------------------------------------------------------- #
-# Item #7 — FundingOICointegrationModel with OI cadence > funding cadence.
+# FundingOICointegrationModel with OI cadence > funding cadence.
 # Multiple funding events must legitimately map to the same most-recent
 # OI value; o_sd may be 0 if no new OI arrived in the window, in which
 # case the model returns flat — that's the documented short-circuit.
@@ -230,7 +230,7 @@ def test_oi_cointegration_constant_oi_returns_flat():
 
 
 # --------------------------------------------------------------------- #
-# Item #8 — PersistentFundingSignModel with len(slc) == 1.
+# PersistentFundingSignModel with len(slc) == 1.
 # slc[-2::-1] is empty, streak stays at 1, below default min_streak => flat.
 # --------------------------------------------------------------------- #
 
@@ -252,7 +252,7 @@ def test_persistent_sign_single_event_meets_min_streak_one():
 
 
 # --------------------------------------------------------------------- #
-# Item #10 — FundingFlipTrigger row-by-row leak pin.
+# FundingFlipTrigger row-by-row leak pin.
 # Polluting strictly past the rows whose flips we care about must
 # leave the emitted set up to T identical, byte-for-byte.
 # --------------------------------------------------------------------- #

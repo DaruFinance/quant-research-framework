@@ -1,4 +1,4 @@
-"""Position-construction neutralizations (item #7, Phase 2).
+"""Position-construction neutralizations (Phase 2).
 
 Three neutralization modes layer on top of a raw weight vector
 (typically the output of an alpha/momentum signal or item #6's

@@ -1,4 +1,4 @@
-"""Panel data loader (item #1, Phase 2).
+"""Panel data loader (Phase 2).
 
 ``load_panel`` reads N per-asset OHLC[+V] CSVs, inner-joins them on the
 ``time`` column, and returns an ``xarray.Dataset`` keyed by

@@ -1,4 +1,4 @@
-"""Tests for spread-definition primitives (item #10, Phase 3)."""
+"""Tests for spread-definition primitives (Phase 3)."""
 from __future__ import annotations
 
 from pathlib import Path

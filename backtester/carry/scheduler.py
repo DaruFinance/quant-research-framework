@@ -1,4 +1,4 @@
-"""Event-driven rebalance scheduler (item #42, Phase 3).
+"""Event-driven rebalance scheduler (Phase 3).
 
 The scheduler fans in three event streams — fixed-cadence bar clock,
 funding events (#38), and arbitrary trigger events (#39s) — and

@@ -1,4 +1,4 @@
-"""Walk-forward orchestrator dispatch table (item #5).
+"""Walk-forward orchestrator dispatch table.
 
 Replaces the if/else inside ``_walk_forward_impl`` with a registry keyed
 on a 5-bool ``RouteKey``. Phase 1 registers two entries:

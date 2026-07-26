@@ -37,7 +37,7 @@ _MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "30"))
 
 
 # ---------------------------------------------------------------------------
-# Item #46: hold-period cap. Pure index arithmetic (idx and ent_bar
+# hold-period cap. Pure index arithmetic (idx and ent_bar
 # both at-or-before this bar), so trivially lookahead-free.
 # ---------------------------------------------------------------------------
 @given(
@@ -99,7 +99,7 @@ def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
 
 
 # ---------------------------------------------------------------------------
-# Item #14: invariant-registry harness self-tests.
+# invariant-registry harness self-tests.
 # ---------------------------------------------------------------------------
 def test_harness_catches_known_leak():
     """A deliberately leaky function must trip assert_no_lookahead.
@@ -277,7 +277,7 @@ def test_trade_indices_well_formed_property(seed: int, n: int, lb: int):
 
 
 # ---------------------------------------------------------------------------
-# Property 3b: aggregate_legs (item #2) is pure data-only. Polluting the
+# Property 3b: aggregate_legs is pure data-only. Polluting the
 # tail of the input leg list at positions >= T cannot change the first T
 # Trade groups in the output. Pure lookahead-freeness check on the
 # aggregation layer that sits between the kernel's per-leg 9-tuples and

@@ -1,4 +1,4 @@
-"""Long-short basket primitive (item #8, Phase 2).
+"""Long-short basket primitive (Phase 2).
 
 A panel-level strategy that:
 1. Evaluates an alpha function at the rebalance bar (function gets
@@ -66,7 +66,7 @@ class LongShortBasket:
         ``alpha_fn(panel, t_idx)``. Must read only ``<= t_idx``.
     neutralize_mode
         One of ``"dollar"``, ``"beta"``, ``"sigma"``. Drives the
-        post-ranking weight construction (item #7).
+        post-ranking weight construction.
     n_long, n_short
         Number of top / bottom alpha-ranked assets to enter long /
         short.

@@ -1,4 +1,4 @@
-"""Spread-definition primitives (item #10, Phase 3).
+"""Spread-definition primitives (Phase 3).
 
 Given a panel (or a pair of return series) and a target endpoint
 ``t_idx``, each primitive computes the spread series up to ``t_idx``

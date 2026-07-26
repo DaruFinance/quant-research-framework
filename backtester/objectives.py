@@ -1,4 +1,4 @@
-"""Multi-term IS objective functions (item #44, Phase 2).
+"""Multi-term IS objective functions (Phase 2).
 
 Default scoring in the single-asset optimiser is one of
 ``ROI / PF / Sharpe / WinRate / Exp / MaxDrawdown / Consistency``

@@ -11,7 +11,7 @@
     "USE_MONTE_CARLO": false,
     "USE_WFO": true,
     "strategy": "bundled default (create_raw_signals: EMA(20) vs EMA(lb) cross)",
-    "note": "Defaults (IS=10K/OOS=90K/WFO=5K) do not fit a 1000-bar slice; values above are the smallest that produce meaningful trade activity while still exercising WFO. Item #2 verification uses the same config."
+    "note": "Defaults (IS=10K/OOS=90K/WFO=5K) do not fit a 1000-bar slice; values above are the smallest that produce meaningful trade activity while still exercising WFO. The same config is used for ledger verification."
   },
   "metrics_by_tag": {
     "IS-raw": {
