@@ -69,8 +69,8 @@ constants at the top of that file to change any of them, no example
 changes required.
 
 ```bash
-# Reference strategy (EMA crossover): this is backtester.py
-python backtester.py
+# Reference strategy (EMA crossover): the engine's own default
+python -m backtester
 
 # ATR-cross with RSI confluence: this folder
 python examples/atr_cross/atr_cross.py
@@ -81,7 +81,7 @@ python examples/end_to_end/end_to_end.py
 
 # Point either one at a different CSV without editing sources
 python examples/atr_cross/atr_cross.py path/to/ohlc.csv
-BT_CSV=path/to/ohlc.csv python backtester.py
+BT_CSV=path/to/ohlc.csv python -m backtester
 ```
 
 The `BT_CSV` env var is the escape hatch that lets strategy scripts

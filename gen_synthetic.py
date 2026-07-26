@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Generate a synthetic OHLC CSV so you can kick the tyres on backtester.py
+Generate a synthetic OHLC CSV so you can kick the tyres on the engine
 without needing real market data or network access.
 
 Close prices follow a geometric Brownian motion (drift + vol), and each
@@ -18,7 +18,7 @@ Usage:
     python gen_synthetic.py --seed 7            # deterministic output
 
 Then:
-    BT_CSV=data/SYNTHETIC.csv python backtester.py
+    BT_CSV=data/SYNTHETIC.csv python -m backtester
 """
 
 import argparse
@@ -91,7 +91,7 @@ def main(argv=None) -> int:
             f.write(f"{int(t)},{o:.8f},{h:.8f},{l:.8f},{c:.8f}\n")
 
     print(f"Wrote {args.bars} bars ({args.interval}) to {args.out}")
-    print(f"Next: BT_CSV={args.out} python backtester.py")
+    print(f"Next: BT_CSV={args.out} python -m backtester")
     return 0
 
 

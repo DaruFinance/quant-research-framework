@@ -75,6 +75,17 @@ python gen_synthetic.py
 BT_CSV=data/SYNTHETIC.csv python -m backtester
 ```
 
+The same thing from PowerShell:
+
+```powershell
+pip install -r requirements.txt
+python gen_synthetic.py
+$env:BT_CSV = "data/SYNTHETIC.csv"; python -m backtester
+```
+
+No network and no market data required: the generator writes a deterministic
+GBM series and the run prints the full IS / OOS / walk-forward metric block.
+
 For real market data, swap the generator for a download:
 
 ```bash
