@@ -1,5 +1,7 @@
 # Quant Research Backtester (Walk-Forward + Robustness)
 
+> The backtester underneath most of what Daniel Gatto publishes on [daru.finance/research/quant-framework](https://www.daru.finance/research/quant-framework).
+
 [![parity](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml)
 [![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
