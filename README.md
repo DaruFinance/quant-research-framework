@@ -257,9 +257,16 @@ These three are the original parity surfaces; v0.6.0 adds more (volume, shared
 indicators, IS-surface, overfitting statistics). Maximum observed relative
 deviation on the default surfaces is below `5e-5` (the metric ledger's `%.4f`
 print precision floor), 20× tighter than the declared `1e-3` tolerance. We
-avoid the term *byte-identical* throughout: parity is tolerance-bounded by
-construction, not bit-equality, and is enforced continuously by the
-`parity_*.py` suite in CI.
+avoid the term *byte-identical* for the cross-language axis: parity there is
+tolerance-bounded by construction, not bit-equality, and is enforced
+continuously by the `parity_*.py` suite in CI.
+
+Cross-*architecture* parity, by contrast, **is** byte-identical. The Rust
+port compiled for `aarch64-unknown-linux-gnu` reproduces every printed
+metric digit exactly against committed x86_64 goldens, across all six
+bundled datasets (196 metric lines each, 1,176 in total), gated in CI by
+[`tools/parity_arch.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_arch.py)
+on an x86_64 drift guard, a QEMU aarch64 run, and a native ARM runner.
 
 It runs **23.8–57× faster** (Python reference vs Rust port) and uses **33–65× less memory**:
 
@@ -282,7 +289,7 @@ Rust repo.)
 What this framework emphasises that mainstream open-source alternatives do
 not (verified against primary docs as of 2026-04):
 
-| Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
+| Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language parity tests |
 |------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
 | **this** (Python + Rust) | Apache-2.0                    | ✓            | ✓                          | ✓                         | ✓                                |
 | [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |
