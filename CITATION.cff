@@ -7,11 +7,11 @@ authors:
     given-names: "Daniel"
     alias: "DaruFinance"
     email: "77agdg@gmail.com"
-version: "0.6.0"
-date-released: "2026-06-12"
+version: "0.7.0"
+date-released: "2026-07-26"
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
-url: "https://doi.org/10.5281/zenodo.19798594"
-doi: 10.5281/zenodo.19798594
+url: "https://doi.org/10.5281/zenodo.19798593"
+doi: 10.5281/zenodo.19798593
 license: Apache-2.0
 keywords:
   - backtesting
@@ -23,5 +23,5 @@ references:
   - type: software
     title: "quant-research-framework-rs (Rust port)"
     repository-code: "https://github.com/DaruFinance/quant-research-framework-rs"
-    doi: 10.5281/zenodo.19798592
+    doi: 10.5281/zenodo.19798591
     license: Apache-2.0
