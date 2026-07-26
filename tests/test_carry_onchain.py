@@ -1,4 +1,4 @@
-"""Tests for on-chain loader & snapshot pinning (Phase 3 item #41)."""
+"""Tests for on-chain loader & snapshot pinning."""
 from __future__ import annotations
 
 import shutil

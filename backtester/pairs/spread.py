@@ -14,7 +14,7 @@ using only data at indices ``<= t_idx``. Five primitives ship:
   predictor; e.g. RandomForestRegressor with sklearn.
 
 All primitives are leak-free by construction. The HIGH-RISK
-counterpart is item #11's *cadence engine*, which re-fits β at chosen
+counterpart is the *cadence engine*, which re-fits β at chosen
 times, its leak test is the 50-T pollute battery.
 """
 from __future__ import annotations

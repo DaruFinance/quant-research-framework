@@ -1,4 +1,4 @@
-"""Funding-flip and basis-blowout triggers (item #39s, Phase 3).
+"""Funding-flip and basis-blowout triggers.
 
 These are pure point-in-time predicates over the loaded funding /
 basis frames.  They consume only data at indices ``<= t`` and emit

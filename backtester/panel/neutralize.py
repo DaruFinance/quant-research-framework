@@ -1,7 +1,7 @@
 """Position-construction neutralizations (Phase 2).
 
 Three neutralization modes layer on top of a raw weight vector
-(typically the output of an alpha/momentum signal or item #6's
+(typically the output of an alpha/momentum signal or the sizing
 ERC sizer):
 
 - ``dollar``  : enforce gross long notional == gross short notional.

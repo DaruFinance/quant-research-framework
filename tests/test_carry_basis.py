@@ -1,4 +1,4 @@
-"""Tests for basis loader (Phase 3 item #39)."""
+"""Tests for basis loader."""
 from __future__ import annotations
 
 from pathlib import Path

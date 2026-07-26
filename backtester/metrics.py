@@ -7,7 +7,7 @@ produces, without touching the Numba hot loop:
 
 - ``sortino(returns, annualization)``: mean return / downside
   deviation, annualised by ``sqrt(annualization)``. The missing
-  cousin to ``Sharpe`` in the v0.4.0 baseline, item #44 finally
+  cousin to ``Sharpe`` in the v0.4.0 baseline, and it finally
   lands it.
 
 - ``turnover(positions)``: sum of absolute position changes per bar.

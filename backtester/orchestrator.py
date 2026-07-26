@@ -12,9 +12,9 @@ Subsequent phases plug additional routes:
   variants that iterate the same global WFO window grid over an
   asset panel.
 - Phase 3 plugs pair-as-unit and cohort routes via #5(iter) too.
-- Item #28 / #34 flip ``multi_leg=True``; item #3 flips
+- The hedge engine and arb state machine flip ``multi_leg=True``; the cost decomposition flips
   ``record_costs=True`` (today only gates stdout exposure, not
-  routing); item #46 flips ``hold_period_set=True``.
+  routing); the hold-period cap flips ``hold_period_set=True``.
 
 The dispatch is **pure routing**: each registered function preserves
 the existing no-look-ahead and parity guarantees of the path it wraps.

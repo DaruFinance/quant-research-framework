@@ -24,7 +24,7 @@ from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
-from . import orchestrator  # item #5: WFO dispatch registry
+from . import orchestrator  # WFO dispatch registry
 from numba import njit, types
 from numba.typed import List
 
@@ -324,7 +324,7 @@ class Config:
     # Overfitting-statistics report; default OFF.
     overfit_report: bool = False
 
-    # ---- item #1 (IS isosurface emit) ----
+    # ---- IS isosurface emit ----
     emit_opt_surface: bool = False
     emit_opt_surface_sl: bool = False
 
@@ -677,7 +677,7 @@ def load_ohlc(path: str) -> pd.DataFrame:
             "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
             "You can generate one with binance_ohlc_downloader.py (see README)."
         )
-    # item #2: optional 6th OHLCV column. Volume is read when present and
+    # optional 6th OHLCV column. Volume is read when present and
     # NaN-filled to 0.0; absent it is simply not loaded, so existing 5-col
     # OHLC CSVs and their parity remain byte-identical.
     _avail = pd.read_csv(path, nrows=0).columns
@@ -1375,7 +1375,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                          sl_perc, tp_perc, pip_size,
                          fee_rate, slip, funding_rate,
                          position_size, account_size,
-                         # item #46: hold-period bin -----------------------------------
+                         # hold-period bin -----------------------------------
                          max_hold_bars,
                          # clamp realized pnl-before-costs to [-1R, +RRR*R] (crypto only)
                          clamp_results,
@@ -1827,8 +1827,8 @@ def _backtest_numba_core(o, h, l, c, sig,
     metrics_tuple = (tc, roi, pf, wr, expc, shp, dd, consistency)
 
 
-    # Pack trades as list of 14-tuples: 7 legacy fields, item #2's
-    # leg_id and trade_group_id, then item #3's 5 cost-decomposition
+    # Pack trades as list of 14-tuples: 7 legacy fields, the
+    # leg_id and trade_group_id, then the 5 cost-decomposition
     # fields (fee, slippage, funding, gross_pnl, net_pnl). pnl at
     # index 6 and net_pnl at index 13 are equal by construction;
     # consumers reading the legacy 7-tuple via slicing and the metric
@@ -1920,7 +1920,7 @@ def backtest(df, raw_sig, carry_in=None):
         0.0 if FOREX_MODE else FUNDING_FEE/100,
         1.0 if FOREX_MODE else RISK_AMOUNT,
         ACCOUNT_SIZE,
-        MAX_HOLD_BARS,                                  # item #46
+        MAX_HOLD_BARS,
         CLAMP_RESULTS,                                  # crypto R-clamp toggle
         carry_side_num, carry_ent, carry_price
     )
@@ -2103,7 +2103,7 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
                     print(f"Smart Optimization: switched from LB {best_lb} to LB {lb_cand} because PF spike exceeded 10% vs neighbors.")
                 break
 
-    # --- item #3 opt-in side-channel: capture the distinct trial Sharpes ---
+    # --- opt-in side-channel: capture the distinct trial Sharpes ---
     # eval_cache maps each EVALUATED lookback -> (val, lb, met). The set of
     # distinct lookbacks IS the "strategies tried" set for this single IS
     # optimisation: window-count-free (effective-trials discipline). Pure
@@ -3165,7 +3165,7 @@ def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] =
 
 
 def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
-    """Walk-forward driver. Item #5 turned this into a thin dispatcher;
+    """Walk-forward driver. A thin dispatcher;
     the regime / no-regime path bodies live in
     ``_walk_forward_regime_path`` and ``_walk_forward_default_path``,
     both registered in ``backtester.orchestrator`` under their
@@ -3212,7 +3212,7 @@ def _build_rb_scenarios():
 
 
 def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
-    """Regime + WFO path. Extracted from _walk_forward_impl in item #5;
+    """Regime + WFO path. Extracted from _walk_forward_impl;
     body unchanged from the pre-refactor branch at v0.4.0+#3."""
     # ===== 1.  WFO **with** regime segmentation ============================
     # Rewritten in v0.2.0: WFO walks the standard cadence (candles or trades).
@@ -3336,7 +3336,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
 
 
 def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
-    """No-regime path. Extracted from _walk_forward_impl in item #5;
+    """No-regime path. Extracted from _walk_forward_impl;
     body unchanged from the pre-refactor branch."""
     # ===== 2.  WFO **without** regime segmentation =========================
     n           = len(df)
@@ -3820,7 +3820,7 @@ def _main_impl():
 
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
 
-    # item #3: clear any stale side-channel from a prior main() call in the
+    # clear any stale side-channel from a prior main() call in the
     # same process. On the regime-no-WFO path optimiser() is never called,
     # so without this the report could surface a phantom trial vector from
     # an unrelated earlier run. An empty capture then honestly reports N=0
@@ -3830,7 +3830,7 @@ def _main_impl():
 
     # 1) baseline run
     base = classic_single_run(df)
-    # item #3: snapshot the baseline IS optimisation's distinct trial
+    # snapshot the baseline IS optimisation's distinct trial
     # Sharpes NOW, before the WFO loop's per-window optimiser() calls
     # overwrite the side-channel. Canonical "strategies tried" set.
     _overfit_trials = list(_runtime_state.get('_last_trial_sharpes', [])) \
@@ -3868,7 +3868,7 @@ def _main_impl():
     if USE_WFO:
         print(" Running Walk-Forward Windows ")
         oos_rets, eq_wfo, rb_eq_wfo, split_wfo_is = walk_forward(df, base['met_is'], base['eq_is'])
-        # item #3: opt-in overfitting diagnostics. Additive lines only; none
+        # opt-in overfitting diagnostics. Additive lines only; none
         # carry the LINE_RE metric body, so parity harnesses are unaffected.
         # trial count = distinct baseline strategies (NOT windows*combos). The
         # chosen Sharpe is recomputed FROM oos_rets inside emit() in the

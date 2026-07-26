@@ -27,7 +27,7 @@ class Leg:
 
     The kernel emits (side, ent, exi, ep, xp, qty, pnl, leg_id, tgid,
     fee, slippage, funding, gross_pnl, net_pnl). Items #1-7 are the
-    legacy fields; #8-9 carry the multi-leg group (item #2); #10-14
+    legacy fields; #8-9 carry the multi-leg group; #10-14
     are the cost decomposition satisfying
         gross_pnl - fee - slippage - funding == net_pnl
     to floating-point tolerance. pnl == net_pnl by construction.
@@ -183,5 +183,5 @@ def print_trade_audit(
 
 # Forward-looking. Currently unused but documents intent; flipping it
 # does not change kernel behaviour. It will gate downstream analytics
-# in items #28 (hedge engine) and beyond.
+# in the hedge engine and beyond.
 MULTI_LEG: bool = False

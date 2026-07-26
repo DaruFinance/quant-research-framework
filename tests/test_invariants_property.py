@@ -328,7 +328,7 @@ def test_aggregate_legs_no_leak_property(seed: int, n: int, cut_frac: float):
 
 
 # ---------------------------------------------------------------------------
-# Property 3c: item #3 cost decomposition identity. For every trade leg the
+# Property 3c: cost decomposition identity. For every trade leg the
 # kernel emits, gross_pnl - fee - slippage - funding == net_pnl to floating-
 # point tolerance, AND polluting the cost columns at positions > T cannot
 # corrupt the cost values stored in Leg objects from positions <= T.

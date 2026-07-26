@@ -7,7 +7,7 @@ Python build session and the Rust port session, every test here is
 a regression pin; none expect a code change in the carry source.
 
 Order roughly matches the 10-item checklist in
-``handoff_phase3_to_rust.md``.  Items #1, #5 do not produce tests
+the Rust mirror handoff. Two of the loaders do not produce tests
 (rationale documented inline).
 """
 from __future__ import annotations

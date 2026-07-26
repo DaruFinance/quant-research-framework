@@ -1,4 +1,4 @@
-"""Persistent-funding-sign carry model (Phase 3 item #43)."""
+"""Persistent-funding-sign carry model."""
 from __future__ import annotations
 
 from typing import Optional

@@ -8,7 +8,7 @@ A panel-level strategy that:
 3. Selects the top ``n_long`` as longs and the bottom ``n_short`` as
    shorts; remaining assets get weight 0.
 4. Builds raw weights (+1 for each long, -1 for each short).
-5. Applies one of the item #7 neutralizations (``dollar`` / ``beta``
+5. Applies one of the neutralizations (``dollar`` / ``beta``
    / ``sigma``).
 6. Returns per-asset position weights as a dict ``{asset: weight}``.
 

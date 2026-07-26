@@ -1,4 +1,4 @@
-"""Funding × OI joint-move model (Phase 3 item #43)."""
+"""Funding × OI joint-move model."""
 from __future__ import annotations
 
 import numpy as np

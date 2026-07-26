@@ -19,7 +19,7 @@ polluting the future of any of its callers' inputs cannot change its
 output, which is the no-lookahead guarantee that's exercised by the
 property test in ``tests/test_panel_sizing.py``.
 
-Future items #7 (β-/$-/σ-neutral) and #8 (long-short basket) add more
+The neutralizations and the long-short basket add more
 weight-construction primitives in this same module.
 """
 from __future__ import annotations

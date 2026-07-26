@@ -22,7 +22,7 @@ ship by default; either may be plugged into the orchestrator via
   asset's own regime at ``t`` reads only its own past.
 
 Both functions are registered with the lookahead-leak harness from
-item #14 so the cross-asset pollute test catches any future variant
+the invariant registry so the cross-asset pollute test catches any future variant
 that accidentally peeks at another asset's future close.
 """
 from __future__ import annotations

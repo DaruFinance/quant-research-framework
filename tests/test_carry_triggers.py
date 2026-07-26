@@ -1,4 +1,4 @@
-"""Tests for funding-flip / basis-blowout triggers (Phase 3 item #39s)."""
+"""Tests for funding-flip / basis-blowout triggers."""
 from __future__ import annotations
 
 from pathlib import Path

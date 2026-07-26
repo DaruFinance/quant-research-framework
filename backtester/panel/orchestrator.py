@@ -1,4 +1,4 @@
-"""Panel walk-forward orchestrator (item #5 iter, Phase 2).
+"""Panel walk-forward orchestrator.
 
 Adds the ``multi_asset=True`` routes to the central dispatch table
 introduced by Phase 1 #5. The panel WFO iterates over the assets in a
@@ -9,7 +9,7 @@ dict of per-asset results.
 The contract is: when the strategy is per-asset independent (the
 typical case for Tree-1 trend / momentum panels), each asset's
 trade ledger is bit-identical to running the single-asset WFO on that
-asset alone. Item #6 (ERC sizing), #7 (β-/$-/σ-neutral), #8
+asset alone. ERC sizing, the β-/$-/σ-neutralizations, and the basket
 (long-short basket), and #44 (multi-term objective) layer
 *portfolio-level* state on top of the per-asset ledgers; the per-asset
 core stays the same.
@@ -117,7 +117,7 @@ def _walk_forward_panel_path(
 # entries remain untouched; this adds the multi_asset=True entries.
 # Phase 2 only registers the (multi_asset=True, regime=False) variant;
 # panel + regime composition lands when #4's panel regime detector is
-# wired into the WFO at item #44.
+# wired into the WFO.
 _orch.register(
     _orch.RouteKey(regime=False, multi_asset=True),
     _walk_forward_panel_path,

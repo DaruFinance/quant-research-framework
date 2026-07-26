@@ -9,7 +9,7 @@ trading decision:
 - ``is_eligible_pair``: dispatcher applying the full filter stack
   (ADF p-value, half-life, optional volume floor).
 
-The HIGH-RISK item #11 (re-estimation cadence) uses these as
+The re-estimation cadence engine uses these as
 acceptance gates during its β refits.
 """
 from __future__ import annotations
