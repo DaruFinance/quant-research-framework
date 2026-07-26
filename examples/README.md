@@ -47,8 +47,8 @@ Two equivalent ways to express a crossover:
 
 2. **Cross-events** (sparse). Set `raw[i] = +1` **only** at the bar of a
    cross-up (`fast_prev > slow_prev & fast_prev_prev <= slow_prev_prev`),
-   `-1` only at a cross-down, `0` in between. This is what the proprietary
-   `run_strategies.py` spec builder does and what the ATR example here does.
+   `-1` only at a cross-down, `0` in between. That is what the ATR example
+   here does.
 
 Both produce the same trades, `parse_signals` flip-detects at position
 changes, but the sparse form is tidier when you want to stack a

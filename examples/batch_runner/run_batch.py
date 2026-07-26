@@ -13,7 +13,7 @@ with 8 GB free RAM, the bench runs 12 strategies in ~12 seconds; serial
 on the same machine takes ~70.
 
 Strategies registered here use only the engine's documented public
-indicators (SMA, EMA, ATR, RSI, MACD, Stoch); no proprietary signals.
+indicators (SMA, EMA, ATR, RSI, MACD, Stoch).
 
 Pin BLAS / OMP / MKL to one thread per process *before* importing
 numpy / pandas / numba, the Numba inner loop is already
