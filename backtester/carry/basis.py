@@ -1,4 +1,4 @@
-"""Perp-vs-spot and calendar basis loader (item #39, Phase 3).
+"""Perp-vs-spot and calendar basis loader (Phase 3).
 
 Basis at logical time ``t`` is computed strictly from contemporaneous
 perp and spot quotes available at ``t``.  No look-ahead from later

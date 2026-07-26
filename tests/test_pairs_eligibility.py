@@ -1,4 +1,4 @@
-"""Tests for pre-screening eligibility filters (item #13, Phase 3)."""
+"""Tests for pre-screening eligibility filters (Phase 3)."""
 from __future__ import annotations
 
 import numpy as np

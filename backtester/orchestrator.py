@@ -1,4 +1,4 @@
-"""Walk-forward orchestrator dispatch table (item #5).
+"""Walk-forward orchestrator dispatch table.
 
 Replaces the if/else inside ``_walk_forward_impl`` with a registry keyed
 on a 5-bool ``RouteKey``. Phase 1 registers two entries:
@@ -12,9 +12,9 @@ Subsequent phases plug additional routes:
   variants that iterate the same global WFO window grid over an
   asset panel.
 - Phase 3 plugs pair-as-unit and cohort routes via #5(iter) too.
-- Item #28 / #34 flip ``multi_leg=True``; item #3 flips
+- The hedge engine and arb state machine flip ``multi_leg=True``; the cost decomposition flips
   ``record_costs=True`` (today only gates stdout exposure, not
-  routing); item #46 flips ``hold_period_set=True``.
+  routing); the hold-period cap flips ``hold_period_set=True``.
 
 The dispatch is **pure routing**: each registered function preserves
 the existing no-look-ahead and parity guarantees of the path it wraps.
@@ -57,7 +57,7 @@ def dispatch(key: RouteKey) -> Callable[..., Any]:
     """Resolve a dispatch key to its registered function.
 
     Raises ``KeyError`` with the set of currently-registered keys when
-    ``key`` is missing — surface "no route for this feature combination
+    ``key`` is missing, surface "no route for this feature combination
     yet" loudly rather than fall back to a default that hides a bug.
     """
     if key not in DISPATCH:

@@ -1,21 +1,21 @@
-"""Spread-definition primitives (item #10, Phase 3).
+"""Spread-definition primitives (Phase 3).
 
 Given a panel (or a pair of return series) and a target endpoint
 ``t_idx``, each primitive computes the spread series up to ``t_idx``
 using only data at indices ``<= t_idx``. Five primitives ship:
 
-- ``log_ratio`` — ``log(asset_a / asset_b)``. Constant β=1 implicit.
-- ``ols_resid`` — Rolling OLS-residual spread. β is the slope of
+- ``log_ratio``: ``log(asset_a / asset_b)``. Constant β=1 implicit.
+- ``ols_resid``: Rolling OLS-residual spread. β is the slope of
   ``log(a) ~ log(b)`` over the window ending at ``t_idx``.
-- ``kalman_beta_spread`` — Kalman-filter dynamic β; smoother and
+- ``kalman_beta_spread``: Kalman-filter dynamic β; smoother and
   more responsive than a fixed window.
-- ``pca_resid`` — First-PC residual on an N-asset panel.
-- ``ml_resid`` — Generic residual where the user supplies a fitted
+- ``pca_resid``: First-PC residual on an N-asset panel.
+- ``ml_resid``: Generic residual where the user supplies a fitted
   predictor; e.g. RandomForestRegressor with sklearn.
 
 All primitives are leak-free by construction. The HIGH-RISK
-counterpart is item #11's *cadence engine*, which re-fits β at chosen
-times — its leak test is the 50-T pollute battery.
+counterpart is the *cadence engine*, which re-fits β at chosen
+times, its leak test is the 50-T pollute battery.
 """
 from __future__ import annotations
 

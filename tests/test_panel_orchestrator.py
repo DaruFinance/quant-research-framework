@@ -1,7 +1,7 @@
-"""Tests for the panel orchestrator (item #5 iter, Phase 2).
+"""Tests for the panel orchestrator.
 
 The contract: when the strategy is per-asset independent (the typical
-case before item #6 ERC sizing / #8 basket / #44 multi-term IS land),
+case before ERC sizing, the basket and the multi-term IS objective land),
 each asset's panel-run trade ledger must be bit-identical to running
 the single-asset WFO on that asset's slice alone.
 """

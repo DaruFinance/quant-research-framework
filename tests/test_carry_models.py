@@ -1,4 +1,4 @@
-"""Tests for funding-signal models (Phase 3 item #43)."""
+"""Tests for funding-signal models."""
 from __future__ import annotations
 
 from pathlib import Path

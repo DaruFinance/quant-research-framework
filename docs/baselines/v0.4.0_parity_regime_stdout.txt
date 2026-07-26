@@ -1,4 +1,4 @@
-CSV: /home/daru/quant-research-framework-rs-v2/data/SOLUSDT_1h.csv
+CSV: $QRF_RS_DIR/data/SOLUSDT_1h.csv
 Flags: USE_REGIME_SEG=True, USE_WFO=True, all other flags default
        (USE_MONTE_CARLO=False to keep it deterministic)
 

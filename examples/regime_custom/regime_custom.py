@@ -76,7 +76,7 @@ class TinyKMeansLikeDetector:
     """
     Stand-in for an ML clusterer: bins the previous bar's (return, vol)
     pair into 5 quantile buckets. Replace this with a fitted
-    sklearn.cluster.KMeans / HMM / mixture model — the contract is the
+    sklearn.cluster.KMeans / HMM / mixture model, the contract is the
     same: a function (df) -> pd.Series[label].
     """
     def __init__(self):

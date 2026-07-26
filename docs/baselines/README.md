@@ -1,10 +1,8 @@
 # v0.4.0 baselines
 
-Frozen reference outputs captured at the v0.4.0 head (Phase 0 of the
-extension plan). Every Phase 1+ change must reproduce these when the
-new feature flag is off. If anything below moves, the change is not
-backwards-compatible and the corresponding `docs/verification/itemNN.md`
-gate cannot pass.
+Frozen reference outputs captured at the v0.4.0 head. Every later
+change must reproduce these when its new feature flag is off. If
+anything below moves, the change is not backwards-compatible.
 
 ## Parity surface
 
@@ -17,7 +15,7 @@ gate cannot pass.
 All three were run via:
 
 ```
-QRF_PY_DIR=/home/daru/quant-research-framework-v2 \
+QRF_PY_DIR=$QRF_PY_DIR \
   python3 tools/<script>.py --tol 0.001
 ```
 
@@ -46,10 +44,9 @@ DEFAULT_LB       = 20
 USE_MONTE_CARLO  = False
 ```
 
-The same config is the verification target for item #2 (multi-leg
-trade ledger schema) and item #3 (per-leg costs). Multi-leg flag off →
+The same config is the verification target for the multi-leg trade
+ledger schema and per-leg costs. Multi-leg flag off →
 parsed metrics must match this JSON file to floating-point identity.
 
 The bundled default strategy is the EMA(20) vs EMA(lb) crossover
-(`bt.create_raw_signals`), not an SMA crossover as the original plan
-called it.
+(`bt.create_raw_signals`), not an SMA crossover.

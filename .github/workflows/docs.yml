@@ -32,8 +32,8 @@ jobs:
 
       - name: Build Sphinx
         # NOTE: -W (warnings-as-errors) is intentionally NOT set here while
-        # the six pandas-style docstring warnings tracked in docs/TODO.md
-        # are reformatted to RST. Re-enable -W once that file is empty.
+        # six pandas-style docstring warnings under backtester/ are
+        # reformatted to RST. Re-enable -W once they are gone.
         run: |
           cd docs
           sphinx-build -b html . _build/html

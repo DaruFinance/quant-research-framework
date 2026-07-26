@@ -1,4 +1,4 @@
-"""Tests for the event-driven rebalance scheduler (Phase 3 item #42 — HIGH-RISK)."""
+"""Tests for the event-driven rebalance scheduler."""
 from __future__ import annotations
 
 from pathlib import Path

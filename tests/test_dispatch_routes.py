@@ -1,6 +1,6 @@
-"""Tests for the walk-forward orchestrator dispatch table (item #5).
+"""Tests for the walk-forward orchestrator dispatch table.
 
-Pure routing layer — the registered functions retain their original
+Pure routing layer, the registered functions retain their original
 lookahead-leak and parity guarantees, and these tests assert only that
 the dispatch table itself routes the four Phase-1-relevant key
 combinations correctly.
@@ -19,7 +19,7 @@ from backtester.orchestrator import RouteKey
 
 
 def test_phase1_routes_are_registered():
-    """The two single-asset routes seeded by item #5 must be registered
+    """The two single-asset routes must be registered
     by the time the backtester module finishes import."""
     keys = set(orchestrator.registered_keys())
     assert RouteKey(regime=False) in keys, (

@@ -1,4 +1,4 @@
-"""Extra metric primitives (item #44, Phase 2).
+"""Extra metric primitives (Phase 2).
 
 The single-asset kernel emits a fixed 8-metric tuple (Trades, ROI,
 PF, WinRate, Exp, Sharpe, MaxDD, Consistency). This module adds
@@ -7,7 +7,7 @@ produces, without touching the Numba hot loop:
 
 - ``sortino(returns, annualization)``: mean return / downside
   deviation, annualised by ``sqrt(annualization)``. The missing
-  cousin to ``Sharpe`` in the v0.4.0 baseline — item #44 finally
+  cousin to ``Sharpe`` in the v0.4.0 baseline, and it finally
   lands it.
 
 - ``turnover(positions)``: sum of absolute position changes per bar.

@@ -1,4 +1,4 @@
-"""Funding-rate stream loader (item #38, Phase 3).
+"""Funding-rate stream loader (Phase 3).
 
 Loads a perpetual-futures funding-rate series into an in-memory
 representation aligned to the bar-clock at downstream consumption

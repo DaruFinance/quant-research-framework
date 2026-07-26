@@ -33,7 +33,7 @@ def _df_from_bars(n=600, start_unix=1_600_000_000, interval_s=3600, seed=3):
 
 
 # ---------------------------------------------------------------------------
-# Forex mode: switching it on completely changes PnL semantics — pip-based
+# Forex mode: switching it on completely changes PnL semantics: pip-based
 # R units instead of dollar qty, and funding fees are disabled. The
 # behavioural assertions are: (a) the engine takes a different code path
 # (trade ledger differs from the non-forex run on the same bars/signals),
@@ -59,7 +59,7 @@ def test_forex_mode_changes_pnl_path(monkeypatch):
     pnls_no = [t[6] for t in trades_no]
     pnls_fx = [t[6] for t in trades_fx]
     assert pnls_no != pnls_fx, (
-        "FOREX_MODE flag flipped but trade PnL is byte-identical — flag inert?"
+        "FOREX_MODE flag flipped but trade PnL is byte-identical, flag inert?"
     )
     # Both runs must still produce well-formed metrics.
     for met in (met_no, met_fx):
@@ -85,7 +85,7 @@ def test_session_mode_blocks_out_of_session_entries(monkeypatch):
 
     # parse_signals should already have masked out-of-session entries via
     # the in_flags mechanism. Verify by inspecting the entry timestamp of
-    # every executed trade — it must be inside the session window in NY tz.
+    # every executed trade: it must be inside the session window in NY tz.
     start_t = datetime.strptime("8:00", "%H:%M").time()
     end_t   = datetime.strptime("16:50", "%H:%M").time()
     for side, ent_idx, *_ in trades:
@@ -93,7 +93,7 @@ def test_session_mode_blocks_out_of_session_entries(monkeypatch):
         local = ts.timetz().replace(tzinfo=None)
         assert start_t <= local < end_t, (
             f"trade entered at {local} (NY) outside session window "
-            f"{start_t}..{end_t} — TRADE_SESSIONS not enforced?"
+            f"{start_t}..{end_t}, TRADE_SESSIONS not enforced?"
         )
 
 
@@ -164,7 +164,7 @@ def test_news_injection_perturbs_bars():
     diff_high = (perturbed["high"] - df["high"]).abs()
     diff_low  = (df["low"] - perturbed["low"]).abs()
     assert (diff_high.sum() + diff_low.sum()) > 0, \
-        "inject_news_candles produced an identical bar series — injection broken?"
+        "inject_news_candles produced an identical bar series, injection broken?"
     # OHLC invariants must still hold post-injection.
     assert (perturbed["high"] >= perturbed[["open", "close"]].max(axis=1)).all()
     assert (perturbed["low"]  <= perturbed[["open", "close"]].min(axis=1)).all()

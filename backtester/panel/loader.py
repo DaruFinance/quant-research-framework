@@ -1,4 +1,4 @@
-"""Panel data loader (item #1, Phase 2).
+"""Panel data loader (Phase 2).
 
 ``load_panel`` reads N per-asset OHLC[+V] CSVs, inner-joins them on the
 ``time`` column, and returns an ``xarray.Dataset`` keyed by
@@ -18,7 +18,7 @@ contract:
 
 The loader is pure data-only: it reads CSVs, computes the intersection,
 and emits a Dataset. No time-dependent decisions, no forward-looking
-inputs — trivially lookahead-free.
+inputs, trivially lookahead-free.
 """
 from __future__ import annotations
 

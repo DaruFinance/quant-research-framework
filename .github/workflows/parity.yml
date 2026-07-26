@@ -11,7 +11,7 @@
 name: parity
 
 on:
-  push:                 # every branch — correctness is gated on every push, not just main
+  push:                 # every branch, correctness is gated on every push, not just main
   pull_request:
   workflow_dispatch:
 
@@ -41,7 +41,7 @@ jobs:
           pip install pytest hypothesis
       - name: pytest
         # tests/conftest.py auto-generates a synthetic CSV and sets
-        # BT_CSV before any backtester import — no env var needed here.
+        # BT_CSV before any backtester import: no env var needed here.
         run: pytest -q tests/
 
   parity:
@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: DaruFinance/quant-research-framework-rs
-          ref: main
+          ref: feat/paper-repin
           path: quant-research-framework-rs
 
       - name: Set up Python 3.10
@@ -92,30 +92,30 @@ jobs:
         working-directory: quant-research-framework
         run: pytest -q
 
-      - name: Parity — default config (56 metric points, SOLUSDT 1h)
+      - name: Parity, default config (56 metric points, SOLUSDT 1h)
         working-directory: quant-research-framework-rs
         run: python tools/parity_check.py --csv data/SOLUSDT_1h.csv --tol 0.001
 
-      - name: Parity — regime + WFO (98 metric points, SOLUSDT 1h)
+      - name: Parity, regime + WFO (98 metric points, SOLUSDT 1h)
         working-directory: quant-research-framework-rs
         run: python tools/parity_regime.py --csv data/SOLUSDT_1h.csv --tol 0.001
 
-      - name: Parity — forex mode (56 metric points, EURUSD 1h)
+      - name: Parity, forex mode (56 metric points, EURUSD 1h)
         working-directory: quant-research-framework-rs
         run: python tools/parity_forex.py --csv data/EURUSD_1h.csv --tol 0.001
 
-      - name: Parity — ledger row-by-row (SOLUSDT 1h)
+      - name: Parity, ledger row-by-row (SOLUSDT 1h)
         working-directory: quant-research-framework-rs
         run: python tools/parity_ledger.py --csv data/SOLUSDT_1h.csv --tol 0.001
 
-      - name: Parity — default config on BTC 30m (146k bars)
+      - name: Parity, default config on BTC 30m (146k bars)
         working-directory: quant-research-framework-rs
         run: python tools/parity_check.py --csv data/BTCUSDT_30m.csv --tol 0.001
 
-      - name: Parity — default config on DOGE 30m (117k bars)
+      - name: Parity, default config on DOGE 30m (117k bars)
         working-directory: quant-research-framework-rs
         run: python tools/parity_check.py --csv data/DOGEUSDT_30m.csv --tol 0.001
 
-      - name: Parity — default config on 100k synthetic GBM
+      - name: Parity, default config on 100k synthetic GBM
         working-directory: quant-research-framework-rs
         run: python tools/parity_check.py --csv data/SYNTH_100k.csv --tol 0.001

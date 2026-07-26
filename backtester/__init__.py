@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 import os, math, random
 import time as pytime
@@ -24,13 +24,13 @@ from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
-from . import orchestrator  # item #5: WFO dispatch registry
+from . import orchestrator  # WFO dispatch registry
 from numba import njit, types
 from numba.typed import List
 
 # Configuration
 # CSV_FILE can be overridden without editing this file by setting the BT_CSV
-# environment variable — handy when running a strategy example from examples/.
+# environment variable: handy when running a strategy example from examples/.
 CSV_FILE            = os.environ.get("BT_CSV", "data/your_ohlc.csv") # <-- put your CSV here (not included in repo)
 
 ACCOUNT_SIZE        = 100_000.0      # total account equity in USD
@@ -45,7 +45,7 @@ SESSION_START   = "8:00"            # NY open time (HH:MM)
 SESSION_END     = "16:50"            # NY close time (HH:MM)
 NY_TZ           = pytz.timezone("America/New_York")
 
-# Item #46: maximum hold period in bars. 0 = no force-close (engine
+# maximum hold period in bars. 0 = no force-close (engine
 # behaves as pre-#46). When > 0, the kernel emits a code-2/4 close at
 # bar i for any open position with (i - ent_bar) >= MAX_HOLD_BARS.
 # Priority: news/session > hold-period > SL/TP intrabar > signal-driven.
@@ -84,7 +84,7 @@ CONFLUENCES: str | None = None        # "RSIge50", "Pge0.8", ...
 MASK_EXITS = False        # confluence filter: when False (default), the
                           # confluence rule applies only to entries (codes 1, 3);
                           # exit codes (2, 4) pass through unconditionally.
-                          # When True, the rule applies to exits too — useful for
+                          # When True, the rule applies to exits too: useful for
                           # strategies where exit signals also need confirmation.
 
 LEGACY_SIDE_BUG = False   # RRR-optimisation side comparison: the original
@@ -139,7 +139,7 @@ USE_WFO             = True                       # do rolling windows?
 WFO_TRIGGER_MODE    = "candles"                   # "candles" or "trades"
 WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per window
 
-# Overfitting-statistics report (item #3). OFF by default: when on, an
+# Overfitting-statistics report. OFF by default: when on, an
 # ADDITIVE block (DSR/PSR/PBO/MinTRL/MinBTL/haircut) is printed after the
 # walk-forward run. The block's lines never carry the metric body
 # parity_common.LINE_RE matches, so existing parity harnesses stay
@@ -211,7 +211,7 @@ FAST_EMA_SPAN = 20
 # in pip-install / library workflows that never read CSVs.
 
 # ============================================================================
-# Config dataclass — v0.4.0 library-grade configuration surface.
+# Config dataclass: v0.4.0 library-grade configuration surface.
 #
 # Background: prior to v0.4.0 every tunable lived as a module-level UPPERCASE
 # constant (FEE_PCT, USE_TP, FOREX_MODE, ...). The engine read those constants
@@ -321,10 +321,10 @@ class Config:
     wfo_trigger_mode: str = "candles"
     wfo_trigger_val: int = 5000
 
-    # Overfitting-statistics report (item #3); default OFF.
+    # Overfitting-statistics report; default OFF.
     overfit_report: bool = False
 
-    # ---- item #1 (IS isosurface emit) ----
+    # ---- IS isosurface emit ----
     emit_opt_surface: bool = False
     emit_opt_surface_sl: bool = False
 
@@ -415,7 +415,7 @@ class Config:
 
         Returns the previous values as a dict, so callers can restore them
         via `restore_module_state(prev)`. Use `with_config(cfg)` instead of
-        calling this directly when possible — the context manager guarantees
+        calling this directly when possible, the context manager guarantees
         restore on exception.
 
         The derived `dd_constraint` and any forex-mode-driven overrides
@@ -508,8 +508,8 @@ def with_config(cfg: Optional[Config]):
 # live as bare module globals (`last_unfiltered_raw`, `_last_df`, ...).
 # By storing them in a dict we can mutate without `global` declarations
 # and we keep a single audit point should we ever want to make these
-# per-call (e.g. truly fork-safe). Today they remain process-global —
-# matching the prior contract — but the surface is cleaner.
+# per-call (e.g. truly fork-safe). Today they remain process-global :
+# matching the prior contract: but the surface is cleaner.
 # ----------------------------------------------------------------------
 _runtime_state: dict[str, Any] = {
     'last_unfiltered_raw': None,
@@ -620,7 +620,7 @@ def _safe_append_or_write_trade_csv(df_export: pd.DataFrame, path: str, write_he
 
 def _metrics_from_trades(trades):
     # 1) per-trade returns in R-units vs USD
-    # Item #2: trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
+    # trades are 9-tuples (side, ent, exi, ep, xp, qty, pnl,
     # leg_id, tgid). pnl is at index 6; do not use *_, pnl which would
     # capture tgid as pnl. Indexing by [6] is robust to future widening.
     if FOREX_MODE:
@@ -677,7 +677,7 @@ def load_ohlc(path: str) -> pd.DataFrame:
             "Put your OHLC CSV at that path, or change CSV_FILE / set BT_CSV.\n"
             "You can generate one with binance_ohlc_downloader.py (see README)."
         )
-    # item #2: optional 6th OHLCV column. Volume is read when present and
+    # optional 6th OHLCV column. Volume is read when present and
     # NaN-filled to 0.0; absent it is simply not loaded, so existing 5-col
     # OHLC CSVs and their parity remain byte-identical.
     _avail = pd.read_csv(path, nrows=0).columns
@@ -1021,7 +1021,7 @@ def parse_signals(raw: np.ndarray, times: pd.Series) -> np.ndarray:
 
         # Optional symmetric exit-side filter. When MASK_EXITS is True the
         # confluence rule applies to exit codes (2 = long-close, 4 = short-close)
-        # too — the bar must satisfy the confluence (codes != 0) for the exit
+        # too: the bar must satisfy the confluence (codes != 0) for the exit
         # to fire. This is desirable for strategies whose exits also need
         # confirmation (e.g. only close on a confirming candle); the default
         # (False) preserves the v0.2.x behaviour where exits are unconditional
@@ -1077,10 +1077,10 @@ def detect_regimes(df: pd.DataFrame) -> pd.Series:
 
     Custom detectors must:
       * Return labels that are a subset of `REGIME_LABELS` (length 2..5)
-      * Be free of look-ahead — only use information available at bar i-1 or
+      * Be free of look-ahead: only use information available at bar i-1 or
         earlier when labelling bar i.
 
-    The ``@registers_invariant`` decorator (item #14) auto-registers this
+    The ``@registers_invariant`` decorator auto-registers this
     function with the lookahead-leak harness so its claim of lookahead
     freeness is property-tested every CI run. Custom detectors plugged in
     via ``bt.detect_regimes = my_detector`` should also be decorated to
@@ -1118,7 +1118,7 @@ def evaluate_filters(trades, rets, regimes=None):
     module-level *blocked_* structures according to:
          TradeCount > 50  and  PF < 1    block
     """
-    # Was: `global blocked_regimes, ...` — but those names are mutated
+    # Was: `global blocked_regimes, ...`: but those names are mutated
     # in-place via .clear()/.add()/.setdefault(), no rebind, so the
     # `global` keyword was redundant. Removed in v0.4.0.
     blocked_regimes.clear()
@@ -1311,7 +1311,7 @@ def _five_segment_sums(vec):
 def _decompose_costs(side_val, entry_price, exit_price, qty,
                      fee_entry, fee_exit, funding_acc, slip,
                      use_forex, pnl):
-    """Item #3 cost decomposition for a single trade leg.
+    """cost decomposition for a single trade leg.
 
     Returns (fee, slippage, funding, gross_pnl) such that:
         gross_pnl - fee - slippage - funding == pnl   (to fp tolerance)
@@ -1375,7 +1375,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                          sl_perc, tp_perc, pip_size,
                          fee_rate, slip, funding_rate,
                          position_size, account_size,
-                         # item #46: hold-period bin -----------------------------------
+                         # hold-period bin -----------------------------------
                          max_hold_bars,
                          # clamp realized pnl-before-costs to [-1R, +RRR*R] (crypto only)
                          clamp_results,
@@ -1393,13 +1393,13 @@ def _backtest_numba_core(o, h, l, c, sig,
     trades_xp    = List.empty_list(types.float64)     #  exit price
     trades_qty   = List.empty_list(types.float64)     #  quantity
     trades_pnl   = List.empty_list(types.float64)     #  pnl
-    # Item #2: per-leg metadata. Single-leg single-asset mode emits
+    # per-leg metadata. Single-leg single-asset mode emits
     # leg_id=0 and trade_group_id=row_index, so downstream aggregation
     # via backtester.ledger.aggregate_legs is uniform across single- and
     # multi-leg trades. Metric output stays bit-identical to v0.4.0.
     trades_leg_id = List.empty_list(types.int32)
     trades_tgid   = List.empty_list(types.int64)
-    # Item #3: cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
+    # cost decomposition. fee = qty*(ent_price+exi_price)*fee_rate;
     # slippage = qty*slip*(raw_entry+raw_exit) recovered from slipped
     # prices via entry_price/(1+slip) for long entries (and the obvious
     # mirror for shorts); funding = funding_acc accrued during the
@@ -1453,7 +1453,7 @@ def _backtest_numba_core(o, h, l, c, sig,
             continue
 
         # forced exit for session end. v0.2.3 fix: drop the prior
-        # `and code != 0` guard — the force-close should fire whenever an
+        # `and code != 0` guard: the force-close should fire whenever an
         # open position exists at a session-end bar, regardless of whether
         # the strategy happens to emit a signal on that same bar.
         # Prior behaviour silently carried positions across out-of-session
@@ -1463,7 +1463,7 @@ def _backtest_numba_core(o, h, l, c, sig,
         if open_pos != 0:
             if use_sessions and end_bar_flag:
                 code = 2 if open_pos == 1 else 4
-            # Item #46: hold-period force-close. Pure index arithmetic
+            # hold-period force-close. Pure index arithmetic
             # (idx and ent_bar are both at or before this bar), so
             # lookahead-free by construction. Only fires if session
             # didn't already set code via the elif chain semantics.
@@ -1513,7 +1513,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                 else:
                     pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                           - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition BEFORE funding_acc reset so
+                # cost decomposition BEFORE funding_acc reset so
                 # the helper sees the funding actually paid on this leg.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     open_pos, entry_price, exit_price, qty,
@@ -1568,7 +1568,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                              fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition.
+                # cost decomposition.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     -1, entry_price, exit_price, qty,
                     fee_entry, fee_exit, funding_acc, slip,
@@ -1621,7 +1621,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                              fee_entry, fee_exit, funding_acc)
                 else:
                     pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
-                # Item #3: cost decomposition.
+                # cost decomposition.
                 fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                     1, entry_price, exit_price, qty,
                     fee_entry, fee_exit, funding_acc, slip,
@@ -1671,7 +1671,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                          fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (exit_price - entry_price) - (fee_entry + fee_exit + funding_acc)
-            # Item #3: cost decomposition.
+            # cost decomposition.
             fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                 1, entry_price, exit_price, qty,
                 fee_entry, fee_exit, funding_acc, slip,
@@ -1714,7 +1714,7 @@ def _backtest_numba_core(o, h, l, c, sig,
                                          fee_entry, fee_exit, funding_acc)
             else:
                 pnl = qty * (entry_price - exit_price) - (fee_entry + fee_exit + funding_acc)
-            # Item #3: cost decomposition.
+            # cost decomposition.
             fee_v, slip_v, fund_v, gross_v = _decompose_costs(
                 -1, entry_price, exit_price, qty,
                 fee_entry, fee_exit, funding_acc, slip,
@@ -1760,8 +1760,8 @@ def _backtest_numba_core(o, h, l, c, sig,
         else:
             pnl = qty * ((exit_price - entry_price) if open_pos==1 else (entry_price - exit_price)) \
                   - (fee_entry + fee_exit + funding_acc)
-        # Item #3: cost decomposition (force-close on last bar; no
-        # funding_acc reset needed — kernel returns shortly after).
+        # cost decomposition (force-close on last bar; no
+        # funding_acc reset needed: kernel returns shortly after).
         fee_v, slip_v, fund_v, gross_v = _decompose_costs(
             open_pos, entry_price, exit_price, qty,
             fee_entry, fee_exit, funding_acc, slip,
@@ -1793,7 +1793,7 @@ def _backtest_numba_core(o, h, l, c, sig,
     pnl    = np.asarray(trades_pnl,   dtype=np.float64)
     legid  = np.asarray(trades_leg_id, dtype=np.int32)
     tgid   = np.asarray(trades_tgid,   dtype=np.int64)
-    # Item #3: cost decomposition arrays.
+    # cost decomposition arrays.
     fees_arr  = np.asarray(trades_fee,     dtype=np.float64)
     slips_arr = np.asarray(trades_slip,    dtype=np.float64)
     funds_arr = np.asarray(trades_funding, dtype=np.float64)
@@ -1827,8 +1827,8 @@ def _backtest_numba_core(o, h, l, c, sig,
     metrics_tuple = (tc, roi, pf, wr, expc, shp, dd, consistency)
 
 
-    # Pack trades as list of 14-tuples: 7 legacy fields, item #2's
-    # leg_id and trade_group_id, then item #3's 5 cost-decomposition
+    # Pack trades as list of 14-tuples: 7 legacy fields, the
+    # leg_id and trade_group_id, then the 5 cost-decomposition
     # fields (fee, slippage, funding, gross_pnl, net_pnl). pnl at
     # index 6 and net_pnl at index 13 are equal by construction;
     # consumers reading the legacy 7-tuple via slicing and the metric
@@ -1920,7 +1920,7 @@ def backtest(df, raw_sig, carry_in=None):
         0.0 if FOREX_MODE else FUNDING_FEE/100,
         1.0 if FOREX_MODE else RISK_AMOUNT,
         ACCOUNT_SIZE,
-        MAX_HOLD_BARS,                                  # item #46
+        MAX_HOLD_BARS,
         CLAMP_RESULTS,                                  # crypto R-clamp toggle
         carry_side_num, carry_ent, carry_price
     )
@@ -1951,7 +1951,7 @@ def optimiser(df, lb_range, metric, min_trades, config: Optional[Config] = None)
 
     `config` is optional. When provided, the engine uses cfg's values for
     the duration of this call (and restores prior values on exit). When
-    omitted, the call reads from module globals as it always has —
+    omitted, the call reads from module globals as it always has ,
     the documented `bt.X = Y` / `monkeypatch.setattr(bt, "X", Y)` API
     keeps working unchanged.
     """
@@ -2103,10 +2103,10 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
                     print(f"Smart Optimization: switched from LB {best_lb} to LB {lb_cand} because PF spike exceeded 10% vs neighbors.")
                 break
 
-    # --- item #3 opt-in side-channel: capture the distinct trial Sharpes ---
+    # --- opt-in side-channel: capture the distinct trial Sharpes ---
     # eval_cache maps each EVALUATED lookback -> (val, lb, met). The set of
     # distinct lookbacks IS the "strategies tried" set for this single IS
-    # optimisation — window-count-free (effective-trials discipline). Pure
+    # optimisation: window-count-free (effective-trials discipline). Pure
     # write to the scratch dict; no return value, printed line, or
     # control-flow change. Gated so default runs are inert.
     if OVERFIT_REPORT:
@@ -2303,7 +2303,7 @@ def export_trades(trades, df, strat, window, sample, path, write_header):
     t, o, h, l, c = (df[x].values for x in ('time','open','high','low','close'))
     rows = []
     for trade in trades:
-        # Item #2: trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
+        # trade is a 9-tuple (legacy 7 fields + leg_id + tgid).
         # *_ swallows the trailing leg metadata; the CSV schema stays at
         # 15 columns so parity_ledger.py keeps working unchanged.
         side, ei, xi, _entry_price, _exit_price, _qty, pnl, *_ = trade
@@ -2702,7 +2702,7 @@ def classic_single_run(df, config: Optional[Config] = None):
 
 
 def _classic_single_run_impl(df):
-    # Was: `global TP_PERCENTAGE, USE_TP, signals_cache` — redundant.
+    # Was: `global TP_PERCENTAGE, USE_TP, signals_cache`: redundant.
     # TP/USE_TP rebinds inside this function are done via `globals()['X']=...`
     # (the only path that the engine respects when reading them back through
     # `backtest()` -> `_backtest_numba_core`); signals_cache is mutated
@@ -2887,7 +2887,7 @@ def _classic_single_run_impl(df):
     # ---------- CASE B  classic optimisation (no regime segment) ----------
     best_lb, met_is_opt = optimiser(is_df, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
 
-    # Item #1: emit the baseline IS objective surface (opt-in, default off).
+    # emit the baseline IS objective surface (opt-in, default off).
     if EMIT_OPT_SURFACE:
         import backtester as _bt2
         from backtester import opt_surface as _osf
@@ -2976,7 +2976,7 @@ def _classic_single_run_impl(df):
             trades_all = tr_is_opt + tr_oos_opt
 
             # 3.b) extract pnl from each trade tuple
-            # Item #2: pnl is at index 6; the 9-tuple's last element is
+            # pnl is at index 6; the 9-tuple's last element is
             # tgid (row index), so trade[-1] would break the cumsum.
             pnl_list = [trade[6] for trade in trades_all]
 
@@ -3067,7 +3067,7 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
     If `best_lbs` is given (regime-segmentation mode), the active LB rotates per
     bar according to `regimes_is` / `regimes_oos`. Otherwise a single `lb` is
     used for the whole window. The WFO walk cadence (window boundaries) is
-    decided by the caller and is *not* affected by regime changes — only the
+    decided by the caller and is *not* affected by regime changes, only the
     per-bar choice of LB inside the window changes.
     """
     use_regime = best_lbs is not None
@@ -3165,7 +3165,7 @@ def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] =
 
 
 def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
-    """Walk-forward driver. Item #5 turned this into a thin dispatcher;
+    """Walk-forward driver. A thin dispatcher;
     the regime / no-regime path bodies live in
     ``_walk_forward_regime_path`` and ``_walk_forward_default_path``,
     both registered in ``backtester.orchestrator`` under their
@@ -3212,7 +3212,7 @@ def _build_rb_scenarios():
 
 
 def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
-    """Regime + WFO path. Extracted from _walk_forward_impl in item #5;
+    """Regime + WFO path. Extracted from _walk_forward_impl;
     body unchanged from the pre-refactor branch at v0.4.0+#3."""
     # ===== 1.  WFO **with** regime segmentation ============================
     # Rewritten in v0.2.0: WFO walks the standard cadence (candles or trades).
@@ -3336,7 +3336,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
 
 
 def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios):
-    """No-regime path. Extracted from _walk_forward_impl in item #5;
+    """No-regime path. Extracted from _walk_forward_impl;
     body unchanged from the pre-refactor branch."""
     # ===== 2.  WFO **without** regime segmentation =========================
     n           = len(df)
@@ -3420,7 +3420,7 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
     return all_oos_rets, eq_wfo, rb_eq_curves, split_wfo_is
 
 
-# Register Phase 1 single-asset orchestrator routes (item #5). Each entry
+# Register Phase 1 single-asset orchestrator routes. Each entry
 # wraps one of the two original _walk_forward_impl branches verbatim;
 # adding new entries (multi_asset=True, multi_leg=True, ...) is the
 # extension point for Phases 2-5.
@@ -3799,7 +3799,7 @@ def main(config: Optional[Config] = None):
     exit). Pass `bt.Config()` to use library defaults regardless of the
     current module state, or `bt.Config.from_module()` to snapshot the
     current state and tweak fields. When omitted, reads from module
-    globals — the legacy `bt.X = Y` API works exactly as before.
+    globals, the legacy `bt.X = Y` API works exactly as before.
     """
     with with_config(config):
         return _main_impl()
@@ -3820,7 +3820,7 @@ def _main_impl():
 
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
 
-    # item #3: clear any stale side-channel from a prior main() call in the
+    # clear any stale side-channel from a prior main() call in the
     # same process. On the regime-no-WFO path optimiser() is never called,
     # so without this the report could surface a phantom trial vector from
     # an unrelated earlier run. An empty capture then honestly reports N=0
@@ -3830,7 +3830,7 @@ def _main_impl():
 
     # 1) baseline run
     base = classic_single_run(df)
-    # item #3: snapshot the baseline IS optimisation's distinct trial
+    # snapshot the baseline IS optimisation's distinct trial
     # Sharpes NOW, before the WFO loop's per-window optimiser() calls
     # overwrite the side-channel. Canonical "strategies tried" set.
     _overfit_trials = list(_runtime_state.get('_last_trial_sharpes', [])) \
@@ -3868,7 +3868,7 @@ def _main_impl():
     if USE_WFO:
         print(" Running Walk-Forward Windows ")
         oos_rets, eq_wfo, rb_eq_wfo, split_wfo_is = walk_forward(df, base['met_is'], base['eq_is'])
-        # item #3: opt-in overfitting diagnostics. Additive lines only; none
+        # opt-in overfitting diagnostics. Additive lines only; none
         # carry the LINE_RE metric body, so parity harnesses are unaffected.
         # trial count = distinct baseline strategies (NOT windows*combos). The
         # chosen Sharpe is recomputed FROM oos_rets inside emit() in the

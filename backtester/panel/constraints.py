@@ -1,7 +1,7 @@
-"""Portfolio-level constraints (item #45, Phase 2 — closes Phase 2).
+"""Portfolio-level constraints (Phase 2, closes Phase 2).
 
 Apply hard caps to a weight vector after sizing and neutralization
-(items #6, #7) have produced their proposed weights. Two caps land
+(#7) have produced their proposed weights. Two caps land
 today:
 
 - ``single_asset_weight_max``: no asset's weight exceeds this in
@@ -84,7 +84,7 @@ def _cap_single_asset(
     iterations (≤ n_assets).
 
     If everyone hits cap before the residual is absorbed, the
-    remaining excess is dropped — the gross notional may shrink
+    remaining excess is dropped, the gross notional may shrink
     accordingly (mathematically unavoidable: with cap c and n legs,
     the max representable gross is n*c).
     """

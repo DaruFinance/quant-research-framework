@@ -1,4 +1,4 @@
-"""Open-interest stream loader (item #40, Phase 3).
+"""Open-interest stream loader (Phase 3).
 
 OI feeds typically come at fixed cadence (Binance: 5m or 1h).  The
 loader normalises columns, asserts the cadence is monotonic and

@@ -1,4 +1,4 @@
-"""Funding-momentum carry model (Phase 3 item #43)."""
+"""Funding-momentum carry model."""
 from __future__ import annotations
 
 import numpy as np

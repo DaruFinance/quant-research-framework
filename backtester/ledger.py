@@ -1,7 +1,7 @@
 """Per-leg trade ledger aggregation.
 
-Item #2 of the v2 extension plan generalises the kernel's 7-tuple trade
-output to a 9-tuple that carries `leg_id` and `trade_group_id`. In
+Generalises the kernel's 7-tuple trade output to a 9-tuple carrying
+`leg_id` and `trade_group_id`. In
 single-leg single-asset mode each kernel-emitted leg IS a logical trade
 (one leg per group, `leg_id == 0`, `trade_group_id == row_index`), so
 the metric output is bit-identical to v0.4.0. In future multi-leg modes
@@ -11,8 +11,8 @@ records.
 
 This module is **pure data-only**: every function reads only its input
 tuples, never the surrounding bar series. That keeps `aggregate_legs`
-trivially lookahead-free under the property-test framework introduced
-in item #14.
+trivially lookahead-free under the property-test framework in
+`backtester/invariants.py`.
 """
 from __future__ import annotations
 
@@ -27,8 +27,8 @@ class Leg:
 
     The kernel emits (side, ent, exi, ep, xp, qty, pnl, leg_id, tgid,
     fee, slippage, funding, gross_pnl, net_pnl). Items #1-7 are the
-    legacy fields; #8-9 carry the multi-leg group (item #2); #10-14
-    are the cost decomposition (item #3) satisfying
+    legacy fields; #8-9 carry the multi-leg group; #10-14
+    are the cost decomposition satisfying
         gross_pnl - fee - slippage - funding == net_pnl
     to floating-point tolerance. pnl == net_pnl by construction.
     """
@@ -41,7 +41,7 @@ class Leg:
     pnl: float
     leg_id: int = 0
     trade_group_id: int = 0
-    # Item #3 cost decomposition. Defaulting to 0.0 keeps the Leg
+    # cost decomposition. Defaulting to 0.0 keeps the Leg
     # constructable from legacy 7- or 9-tuples without ValueErrors.
     fee: float = 0.0
     slippage: float = 0.0
@@ -81,7 +81,7 @@ def aggregate_legs(legs: Iterable) -> List[Trade]:
     and `trade_group_id=row_index`).
 
     Returns `List[Trade]` sorted by `group_id`, each Trade's `legs`
-    sorted by `leg_id`. Pure data-only — no series indexing — so the
+    sorted by `leg_id`. Pure data-only (no series indexing) so the
     function is trivially lookahead-free.
     """
     groups: defaultdict = defaultdict(list)
@@ -136,7 +136,7 @@ def print_trade_audit(
     Picks indices {0, N/4, N/2, 3N/4, N-1} (deduplicated for small N)
     and prints each trade's legs with the indicator values at
     `entry_idx`. The indicator dump is the cornerstone of the
-    lookahead audit — every value listed has an index `<= entry_idx`.
+    lookahead audit, every value listed has an index `<= entry_idx`.
     """
     legs_input = list(trades_or_legs)
     if not legs_input:
@@ -183,5 +183,5 @@ def print_trade_audit(
 
 # Forward-looking. Currently unused but documents intent; flipping it
 # does not change kernel behaviour. It will gate downstream analytics
-# in items #28 (hedge engine) and beyond.
+# in the hedge engine and beyond.
 MULTI_LEG: bool = False

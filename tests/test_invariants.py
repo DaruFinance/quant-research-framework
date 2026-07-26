@@ -56,7 +56,7 @@ def test_no_entry_outside_session_window(monkeypatch):
             violations.append((ent, side, ts_ny))
 
     assert not violations, (
-        f"Session invariant broken — {len(violations)} entries outside the "
+        f"Session invariant broken, {len(violations)} entries outside the "
         f"window. First few: {violations[:5]}"
     )
 
@@ -64,7 +64,7 @@ def test_no_entry_outside_session_window(monkeypatch):
 def test_session_force_close_prevents_overnight_carry(monkeypatch):
     """When TRADE_SESSIONS is on, no trade may span out-of-session bars.
     Fixed in v0.2.2 by removing the `and code != 0` guard on the
-    session-end force-close path — previously that guard silently let
+    session-end force-close path, previously that guard silently let
     positions carry across session gaps when no signal landed on the
     closing bar."""
     monkeypatch.setattr(bt, "TRADE_SESSIONS", True)
@@ -81,7 +81,7 @@ def test_session_force_close_prevents_overnight_carry(monkeypatch):
     overnight = [(ent, exi) for side, ent, exi, *_ in trades
                  if (~in_flags[ent : exi + 1]).any()]
     assert not overnight, (
-        f"Session-end force-close regressed — {len(overnight)} trades span "
+        f"Session-end force-close regressed, {len(overnight)} trades span "
         f"out-of-session bars. First few: {overnight[:5]}"
     )
 
@@ -118,7 +118,7 @@ def test_create_regime_signals_uses_correct_lb_per_bar():
 
     mismatches = np.where(raw != expected)[0]
     assert len(mismatches) == 0, (
-        f"Regime LB rotation broken — {len(mismatches)} bars use the wrong "
+        f"Regime LB rotation broken, {len(mismatches)} bars use the wrong "
         f"slow-EMA. First mismatch idx={mismatches[:5]}"
     )
 
@@ -131,7 +131,7 @@ def test_create_regime_signals_uses_correct_lb_per_bar():
 def test_forex_pnl_clamped_to_R_band(monkeypatch):
     monkeypatch.setattr(bt, "FOREX_MODE", True)
     monkeypatch.setattr(bt, "PIP_SIZE",   0.0001)
-    # Pre-multiply the SL/TP percents — backtester does this at import
+    # Pre-multiply the SL/TP percents: backtester does this at import
     # time when FOREX_MODE is True, but we flipped it at runtime.
     monkeypatch.setattr(bt, "SL_PERCENTAGE", 1.0 * 0.0001)
     monkeypatch.setattr(bt, "TP_PERCENTAGE", 3.0 * 0.0001)
@@ -160,7 +160,7 @@ def test_forex_pnl_clamped_to_R_band(monkeypatch):
 
     out_of_band = [(t[1], t[6]) for t in trades if not (lower <= t[6] <= upper)]
     assert not out_of_band, (
-        f"Forex PnL not clamped — {len(out_of_band)} trades outside "
+        f"Forex PnL not clamped, {len(out_of_band)} trades outside "
         f"[{lower:.6f}, {upper:.6f}]. First few: {out_of_band[:5]}"
     )
 
@@ -196,7 +196,7 @@ def test_trade_indices_and_prices_are_well_formed():
         assert side in (1, -1), f"bad side {side}"
         assert 0 <= ent < n,    f"entry idx {ent} out of range"
         assert 0 <= exi < n,    f"exit idx {exi} out of range"
-        assert ent <= exi,      f"exit {exi} before entry {ent} — time travel?"
+        assert ent <= exi,      f"exit {exi} before entry {ent}, time travel?"
         assert ep > 0 and xp > 0, f"non-positive prices ({ep}, {xp})"
         assert qty >= 0,        f"negative quantity {qty}"
         assert np.isfinite(pnl), f"non-finite PnL {pnl}"
@@ -204,7 +204,7 @@ def test_trade_indices_and_prices_are_well_formed():
 
 # ---------------------------------------------------------------------------
 # parse_signals look-ahead discipline: the flip-code at bar i must depend
-# only on raw[..i+1] and in_flags[..i+1] — not on anything later. Build a
+# only on raw[..i+1] and in_flags[..i+1]: not on anything later. Build a
 # raw signal, parse it, then mutate raw[i+1:] and re-parse; sig[..i+1]
 # must be identical.
 # ---------------------------------------------------------------------------
@@ -281,10 +281,10 @@ def test_wfo_regime_cadence_unaffected_by_regime_flips(monkeypatch):
     bt.walk_forward(df, met_is_baseline=None, eq_is_baseline=np.ones(1))
 
     # Each call's IS slice should be exactly BACKTEST_CANDLES (the standard
-    # WFO cadence) — never some smaller "regime stretch" length.
+    # WFO cadence): never some smaller "regime stretch" length.
     bad = [n for n in calls if n != 600]
     assert not bad, (
-        f"WFO+regime cadence broken — optimize_regimes_sequential called "
+        f"WFO+regime cadence broken, optimize_regimes_sequential called "
         f"with non-standard IS slice lengths: {bad[:5]} "
         f"(all should be BACKTEST_CANDLES=600)"
     )

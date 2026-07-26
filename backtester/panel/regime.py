@@ -1,4 +1,4 @@
-"""Cross-asset regime detection (item #4, Phase 2; HIGH-RISK).
+"""Cross-asset regime detection (Phase 2; HIGH-RISK).
 
 The single-asset ``detect_regimes(df)`` lives in
 ``backtester/__init__.py`` and uses EMA-200 + 8-bar consistency to
@@ -15,14 +15,14 @@ ship by default; either may be plugged into the orchestrator via
 
 - ``detect_regimes_panel_per_asset`` (the registered default):
   each asset's regime is computed from its own close series only.
-  Trivially leak-free across assets — no cross-asset coupling.
+  Trivially leak-free across assets, no cross-asset coupling.
 - ``detect_regimes_panel_market(market_asset='BTC')``: every asset
   inherits ``market_asset``'s regime label at each bar. The
   classic "BTC dominance" regime. Leak-free because the market
   asset's own regime at ``t`` reads only its own past.
 
 Both functions are registered with the lookahead-leak harness from
-item #14 so the cross-asset pollute test catches any future variant
+the invariant registry so the cross-asset pollute test catches any future variant
 that accidentally peeks at another asset's future close.
 """
 from __future__ import annotations

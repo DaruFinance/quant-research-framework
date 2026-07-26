@@ -1,4 +1,4 @@
-# Fully-pinned lock — the exact environment that produced the published
+# Fully-pinned lock: the exact environment that produced the published
 # parity surfaces, the frozen benchmark golden, and the paper's numbers.
 # For BIT-REPRODUCTION, install from this file on CPython 3.10:
 #

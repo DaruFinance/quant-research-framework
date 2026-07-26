@@ -5,19 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] — 2026-06-12
+## [0.7.0] - 2026-07-26
+
+### Fixed
+- **Forex pip size is resolved by the engine, not by the parity harness.** The
+  Python reference resolves `PIP_SIZE` from the dataset path: a `BT_PIP_SIZE`
+  override wins, otherwise a path containing "JPY" resolves to the two-decimal
+  pip of JPY-quoted crosses, otherwise 0.0001. The Rust port hard-coded 0.0001,
+  so any caller using `with_forex_defaults()` on a JPY pair sized every trade
+  100x wrong, rescaling the pip-distance SL/TP levels and flipping P&L signs
+  while leaving entry bars untouched. `tools/parity_forex.py` had been
+  compensating with its own inline JPY case, so the gate was testing the harness
+  rather than the engine. New `resolve_pip_size()` and
+  `Config.with_pip_size_for()` mirror the Python rule, warning included, and
+  the harness workaround is gone. `parity_forex` on USDJPY 1h passes 56/56.
+- **Identical non-finite metrics are no longer reported as divergences.** A
+  stage with zero trades reports profit factor as `inf` in both engines. The
+  relative deviation computed `inf - inf = nan`, and `nan <= tol` is false, so a
+  surface on which the engines agreed exactly was failed. Non-finite values are
+  compared for equality before the ratio is taken; a one-sided `inf` or `nan`
+  is still a real divergence and still fails.
 
 ### Added
-- **OHLCV contract + volume** — optional `volume` column in `load_ohlc` (backward-
+- Both new ablations and the `make sweep` entry point live in the Rust repo,
+  which is where the cross-language harnesses are driven from.
+
+### Changed
+- Internal planning artefacts removed from the public tree: per-item
+  verification logs, the docs TODO, absolute developer paths in the frozen
+  baseline captures, and internal tracker numbers in module headers.
+- Em dashes replaced with plain punctuation throughout.
+- The comparison table's cross-language column no longer reads "byte-parity".
+  Cross-language parity is tolerance-bounded at 1e-3; cross-architecture parity
+  is byte-identical and is now documented with its harness, golden counts and
+  CI gate.
+- Example strategies describe themselves instead of referencing private work.
+
+## [0.6.0] - 2026-06-12
+
+### Added
+- **OHLCV contract + volume**: optional `volume` column in `load_ohlc` (backward-
   compatible; 5-column files load byte-identically), `backtester/volume_indicators.py`
   (OBV, VWAP rolling+session, vol SMA/EMA, relative volume, z-score, MFI, A/D), volume
   strategy examples, cross-engine parity via `tools/parity_volume.py`.
-- **Overfitting-statistics layer** — Probabilistic Sharpe Ratio, Minimum Track-Record
+- **Overfitting-statistics layer**: Probabilistic Sharpe Ratio, Minimum Track-Record
   Length, Minimum Backtest Length in `backtester/dsr.py`; `backtester/haircut.py`
   (Harvey-Liu Bonferroni+BHY); opt-in `backtester/overfit_report.py` emitting
   DSR/PSR/PBO/MinTRL/MinBTL/haircut after the WFO run (gated by `QRF_OVERFIT=1` /
   `Config.overfit_report`, additive lines that never touch the parity surface).
-- **IS parameter-robustness isosurface** — `backtester/opt_surface.py` emits the dense
+- **IS parameter-robustness isosurface**: `backtester/opt_surface.py` emits the dense
   in-sample objective grid (opt-in via `EMIT_OPT_SURFACE` / `Config.emit_opt_surface`);
   `tools/render_surface.py` renders it.
 
@@ -33,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **License → Apache-2.0** (was MIT) across `LICENSE`, the `pyproject.toml` classifier,
   and `README.md`.
 - Version → 0.6.0 (`pyproject.toml` + `backtester.__version__`). One canonical performance
-  band — **23.8–57× faster, 33–65× less memory** vs this Python reference — from the
+  band (**23.8–57× faster, 33–65× less memory** vs this Python reference) from the
   paper-grade harness `tools/bench_paper.py` in the Rust repo (median warm over n=5; the
   5,000-bar 232× is a measurement-floor artifact). This single band now matches the
   README, the paper, and `CITATION.cff`.
@@ -42,16 +78,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All new behaviour is opt-in; the existing parity surfaces remain byte-identical against
   the Rust port.
 
-## [0.4.0] — 2026-05-03
+## [0.4.0] - 2026-05-03
 
 ### Added
-- **`backtester.Config` dataclass** — single library-grade configuration
+- **`backtester.Config` dataclass**: single library-grade configuration
   surface carrying every tunable knob (50+ fields: `fee_pct`, `use_tp`,
   `forex_mode`, `oos_candles`, ...). Defaults mirror the legacy
   module-level UPPERCASE constants exactly, so `Config()` is always
   equivalent to "use the current module defaults".
   - `Config.from_module()` snapshots the live module state into a
-    Config instance — start from "whatever is currently set" and tweak.
+    Config instance, start from "whatever is currently set" and tweak.
   - `Config.apply_to_module()` writes every field back to the module
     globals, returning a snapshot dict. The derived `dd_constraint`
     is recomputed against the new `forex_mode` / `drawdown_constraint`.
@@ -61,17 +97,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     import-time `if FOREX_MODE:` block.
   - `Config.with_sessions(on, start, end)` and `with_oos2(on)` builders
     follow the same copy-then-mutate pattern.
-- **`backtester.with_config(cfg)` context manager** — temporarily applies
+- **`backtester.with_config(cfg)` context manager**: temporarily applies
   a `Config` to module globals for the duration of the block, restores
   prior values on exit (even if the body raises). The single primitive
   the new API stands on.
-- **`config: Config | None = None` kwarg on every public entry-point**
-  — `main()`, `walk_forward()`, `optimiser()`, `optimize_regimes_sequential()`,
+- **`config: Config | None = None` kwarg on every public entry-point**:
+  `main()`, `walk_forward()`, `optimiser()`, `optimize_regimes_sequential()`,
   `monte_carlo()`, `apply_news_injection()`, `classic_single_run()`. When
   passed, the engine uses cfg's values for the call and restores prior
-  state on exit. When omitted, reads from module globals — the legacy
+  state on exit. When omitted, reads from module globals, the legacy
   `bt.X = Y` API works exactly as before.
-- **`tests/test_config_isolation.py`** — 11 new tests covering Config
+- **`tests/test_config_isolation.py`**: 11 new tests covering Config
   field independence, apply/restore round-trip, exception-safe restore,
   forex-mode helper, drawdown-constraint derivation, and end-to-end
   proof that `bt.main(config=cfg)` does not leak into module globals.
@@ -82,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   differently:
   - **Configuration globals** (`TP_PERCENTAGE`, `USE_TP`, `FEE_PCT`,
     `SLIPPAGE_PCT`) that the engine rebinds during RRR optimisation
-    and robustness shocks now use `globals()['X'] = ...` — the same
+    and robustness shocks now use `globals()['X'] = ...`, the same
     pattern already used inside `optimiser()` and friends, just
     extended to the four functions that still leaned on `global`.
     Save/restore semantics unchanged.
@@ -109,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `parity_forex.py`, `parity_ledger.py`) pass at `1e-3 rel-tol` with
   zero deltas (`PARITY OK` / `LEDGER PARITY OK`).
 
-## [0.3.1] — 2026-05-03
+## [0.3.1] - 2026-05-03
 
 ### Fixed
 - **Module import works without a CSV.** The top-level
@@ -138,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block now spells out the constraint and the workaround.
 
 ### Added
-- **`backtester/__main__.py`** — `python -m backtester` entry point so
+- **`backtester/__main__.py`**: `python -m backtester` entry point so
   the README quickstart works post-package refactor (the legacy
   `python backtester.py` form broke when v0.3.0 turned `backtester` into
   a directory).
@@ -149,10 +185,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `examples = ["scikit-learn"]`. `pip install
   quant-research-framework[dev,examples]` installs everything the test
   suite and example notebooks need.
-- **GitHub repo discoverability scaffolding** — issue + PR templates,
+- **GitHub repo discoverability scaffolding**: issue + PR templates,
   `SECURITY.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
   `.github/dependabot.yml` (weekly pip updates), README badges row.
-- **CI improvements** — multi-OS + multi-Python matrix
+- **CI improvements**: multi-OS + multi-Python matrix
   (`{ubuntu, macos, windows} x {3.10, 3.11, 3.12}`) for the pytest job;
   parity scripts remain Linux-only as before. Pre-commit config
   (`ruff format`, `ruff check`) wired into a CI job.
@@ -160,13 +196,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a `.github/workflows/docs.yml` that builds and publishes to
   `gh-pages` on each `main` push.
 - **PyPI publish workflow.** `.github/workflows/publish-pypi.yml`
-  triggered by `v*` tag push, using PyPI trusted publishing — see
+  triggered by `v*` tag push, using PyPI trusted publishing, see
   `RELEASING.md` for the one-time configuration step.
-- **Notebook walkthrough** (`examples/notebook/walkthrough.ipynb`) —
+- **Notebook walkthrough** (`examples/notebook/walkthrough.ipynb`),
   load synthetic data, run baseline, run WFO, plot equity, show
   metrics. Binder launch link in the README, `binder/` dir with
   `requirements.txt` and `runtime.txt`.
-- **Property-test coverage on `walk_forward_regime`** — three new
+- **Property-test coverage on `walk_forward_regime`**: three new
   Hypothesis-based invariants in `tests/test_invariants_property.py`
   guarding the OOS LB rotation against the v0.3.0 parity-bug class.
 - **Notebook + Binder actually shipped.** The previous v0.3.1 entry
@@ -178,7 +214,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `binder/requirements.txt` mirrors the runtime + adds
   `jupyter, matplotlib`; `binder/runtime.txt` pins `python-3.10`;
   README carries a `mybinder.org` launch badge.
-- **CI status badges** — README top now shows a five-badge row
+- **CI status badges**: README top now shows a five-badge row
   (parity, docs, PyPI, DOI, License) so reviewers can see green
   before clicking through. Honest about state: badges flip red the
   moment a workflow breaks.
@@ -196,11 +232,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sphinx-build -W -b html` which converts the six pandas-style
   docstring warnings (under `evaluate_filters`,
   `optimize_regimes_sequential`, `backtester/dsr.py`) into errors,
-  so `gh-pages` never published. Dropped `-W` and added
-  `docs/TODO.md` listing the warnings for follow-up cleanup. Once
-  TODO.md is empty, re-add `-W` to enforce the docstring discipline.
+  so `gh-pages` never published. Dropped `-W` pending a docstring
+  cleanup; re-add it once the warnings are gone to enforce the
+  docstring discipline.
 
-## [0.3.0] — 2026-05-03  (paper-v2 retag)
+## [0.3.0] - 2026-05-03  (paper-v2 retag)
 
 ### Changed
 - **Package layout.** `backtester.py` is now `backtester/__init__.py`;
@@ -223,7 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Rust port within $10^{-3}$ relative tolerance) and the
   four-command verification checklist contributors run before opening
   a PR.
-- **`.github/workflows/parity.yml`** — GitHub Actions parity CI that
+- **`.github/workflows/parity.yml`**: GitHub Actions parity CI that
   builds the Rust port at the matching commit, installs Python deps,
   and runs the four-command checklist on every push and pull request.
 
@@ -233,12 +269,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`DaruFinance`, `Daniel G.`) deprecated for citation-tracking
   consistency. References in arXiv-submitted paper updated to match.
 
-## [0.2.5] — 2026-04-30
+## [0.2.5] - 2026-04-30
 
 ### Fixed
 - **RRR-optimisation side-comparison bug.** The four RRR-probe sites
   (`backtester.py` ~lines 1314, 1657, 1778, 1893) used `side == 'long'`
-  (str compared to int8 — always False), sending all trades to the
+  (str compared to int8, always False), sending all trades to the
   short branch. Now uses `side == 1` by default. Set the new
   `LEGACY_SIDE_BUG` module flag to `True` to opt back into the buggy
   code path for bit-equality with prior research that depends on it
@@ -250,7 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `True`, the active confluence rule (per `CONFLUENCES`) applies to
   exit codes (2, 4) too, not just entries (1, 3). Default preserves
   v0.2.x behaviour (exits unconditional on signal flip).
-- **`listings/lah_demo.py`** — future-pollution probe demonstrating
+- **`listings/lah_demo.py`**: future-pollution probe demonstrating
   that the strategy contract's no-look-ahead obligation is
   user-checkable. Referenced from §3 of the paper.
 
@@ -260,15 +296,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surface, closed in this release; see the Rust repo's
   `tools/parity_forex.py`).
 
-## [0.2.4] — 2026-04-26
+## [0.2.4] - 2026-04-26
 
 ### Added
-- **Comparison matrix** in `README.md` — this framework vs vectorbt /
+- **Comparison matrix** in `README.md`: this framework vs vectorbt /
   backtrader / NautilusTrader / zipline-reloaded / Lean / bt across
   built-in WFO, per-regime LB optimisation, strict-LAH property tests,
   cross-language byte-parity. Verified against primary docs as of
   2026-04.
-- **Benchmark table** in `README.md` — measured numbers from the new
+- **Benchmark table** in `README.md`: measured numbers from the new
   `tools/bench.py` harness in the sibling Rust repo. Replaces the
   unsourced "~24× faster" claim with reproducible figures across four
   dataset sizes (15k / 25k / 35k / 48k bars on the bundled SOL CSV).
@@ -281,12 +317,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   regime+WFO byte-identical parity against this Python reference (see
   the sibling repo's `tools/parity_regime.py`).
 
-## [0.2.3] — 2026-04-26
+## [0.2.3] - 2026-04-26
 
 ### Fixed
 - **Session-end force-close now actually fires.** Two underlying bugs in
   `_backtest_numba_core` / `_prepare_backtest_inputs`:
-  1. `session_end_mask` was set to `times.dt.time == t_end` — i.e. only
+  1. `session_end_mask` was set to `times.dt.time == t_end`: i.e. only
      bars whose NY local time *exactly* equalled SESSION_END
      ("16:50") qualified. Bars at any other minute (e.g. crypto bars
      at HH:00, or the synthetic HH:26:40 fixture) silently never
@@ -306,7 +342,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers from default-config (sessions off) runs are unaffected. The
   v0.1.0 parity harness still reports 56/56 byte-identical.
 
-## [0.2.2] — 2026-04-26
+## [0.2.2] - 2026-04-26
 
 ### Added
 - **Property-check suite** (`tests/test_invariants.py`, 9 tests + 1
@@ -336,7 +372,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.1.0 parity still 56/56 byte-identical at 0.1% tol.
 - 24 tests passing total + 1 documented xfail.
 
-## [0.2.1] — 2026-04-25
+## [0.2.1] - 2026-04-25
 
 ### Added
 - **Behavioural test suite** (`tests/test_behavioural.py`) covering forex
@@ -356,7 +392,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what changed is that those paths now have explicit tests and a
   cross-language oracle backing the parity claim.
 
-## [0.2.0] — 2026-04-25
+## [0.2.0] - 2026-04-25
 
 ### Added
 - **Pluggable regime-detector contract.** New `REGIME_LABELS` (length 2..5)
@@ -368,17 +404,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new contract automatically.
 - **ML signal hooks.** Two new examples mirror the two recommended
   patterns:
-  - `examples/ml_precomputed/` — train offline, attach a `pred` column
+  - `examples/ml_precomputed/`: train offline, attach a `pred` column
     to the OHLC frame, threshold inside the strategy function. Fastest
     path; framework-agnostic.
-  - `examples/ml_callback/` — keep a model in memory and call
+  - `examples/ml_callback/`: keep a model in memory and call
     `predict(features)` per bar; supports online/stateful inference.
 - **Custom regime detector example.** `examples/regime_custom/` ships
   three demos (2-regime volatility, 4-regime trend×vol, 5-regime
   ML-style) showing the contract in action with REGIME_LABELS sets of
   different lengths.
 - `pyproject.toml` (PEP 621), `__version__` constant, `CHANGELOG.md`.
-- `examples/README.md` — new sections covering the ML and custom-regime
+- `examples/README.md`: new sections covering the ML and custom-regime
   contracts.
 
 ### Changed
@@ -388,7 +424,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   IS history. The fixed cadence now matches the no-regime path
   (`WFO_TRIGGER_MODE`, `WFO_TRIGGER_VAL`); regime segmentation only
   controls which per-regime LB is active for each OOS bar inside a
-  window. This is a correctness fix — backtest values for runs with
+  window. This is a correctness fix, backtest values for runs with
   `USE_WFO = True` *and* `USE_REGIME_SEG = True` will differ from
   `0.1.0`. Runs with either flag off are unaffected.
 - `_run_wfo_window` now accepts an optional `best_lbs` dict; when set,
@@ -404,7 +440,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing published research numbers. The fix is tracked for `0.3.0`
   alongside an explicit migration note.
 
-## [0.1.0] — 2026-03 (backfilled)
+## [0.1.0] - 2026-03 (backfilled)
 
 Initial public release. Contained:
 

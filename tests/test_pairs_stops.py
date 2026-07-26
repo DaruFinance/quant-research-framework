@@ -1,4 +1,4 @@
-"""Tests for spread-aware stop-loss families (item #12, Phase 3)."""
+"""Tests for spread-aware stop-loss families (Phase 3)."""
 from __future__ import annotations
 
 import numpy as np

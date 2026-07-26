@@ -1,4 +1,4 @@
-"""Portfolio sizing primitives (item #6, Phase 2).
+"""Portfolio sizing primitives (Phase 2).
 
 Currently exposes:
 
@@ -14,12 +14,12 @@ The ERC solver uses ``scipy.optimize.minimize(SLSQP)`` with:
 
 The function is pure data-only: it takes a 2-D ``returns_window`` of
 shape ``(n_bars, n_assets)`` (or a precomputed covariance matrix), and
-emits a weight vector. **It reads zero data outside its input** — so
+emits a weight vector. **It reads zero data outside its input**, so
 polluting the future of any of its callers' inputs cannot change its
 output, which is the no-lookahead guarantee that's exercised by the
 property test in ``tests/test_panel_sizing.py``.
 
-Future items #7 (β-/$-/σ-neutral) and #8 (long-short basket) add more
+The neutralizations and the long-short basket add more
 weight-construction primitives in this same module.
 """
 from __future__ import annotations

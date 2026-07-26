@@ -1,8 +1,8 @@
-"""Multi-asset panel plugin (Phase 2 items #1, #4, #5(iter), #6-#8, #44-#45).
+"""Multi-asset panel plugin, #6-#8, #44-#45).
 
 Optional package. Pulled in via ``pip install quant-research-framework[panel]``.
 The plugin enables cross-sectional / basket strategies and the
-multi-asset orchestrator routes registered by item #5(iter) (Phase 2).
+multi-asset orchestrator routes registered) (Phase 2).
 
 Importing this package without the ``panel`` extras installed raises a
 clear ``ImportError`` with the install hint, rather than the usual

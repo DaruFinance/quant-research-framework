@@ -1,4 +1,4 @@
-"""Spread re-estimation cadence engine (item #11, Phase 3 — HIGH-RISK).
+"""Spread re-estimation cadence engine (Phase 3, HIGH-RISK).
 
 Schedules β refits at fixed bar cadence, fixed time cadence, or
 trigger-driven (e.g. when z-score breaches a threshold). Every refit

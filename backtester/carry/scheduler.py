@@ -1,7 +1,7 @@
-"""Event-driven rebalance scheduler (item #42, Phase 3).
+"""Event-driven rebalance scheduler (Phase 3).
 
-The scheduler fans in three event streams — fixed-cadence bar clock,
-funding events (#38), and arbitrary trigger events (#39s) — and
+The scheduler fans in three event streams, fixed-cadence bar clock,
+funding events (#38), and arbitrary trigger events (#39s), and
 emits a merged, time-sorted rebalance schedule.  Every decision at
 time ``t`` consumes only state available at ``<= t``.  Pollution of
 the input streams past ``t`` cannot change the next scheduled time
@@ -60,7 +60,7 @@ class EventDrivenScheduler:
         self.triggers = list(triggers)
         self.t_start_s = int(t_start_s)
         self.t_end_s = (int(t_end_s) if t_end_s is not None
-                         else (10**12))   # ~year 33658 — effectively no cap
+                         else (10**12))   # ~year 33658, effectively no cap
 
     def run(self) -> List[ScheduledRebalance]:
         out: List[ScheduledRebalance] = []

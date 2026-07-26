@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ML strategy example: scikit-learn LogisticRegression on lagged
-return + RSI + ATR features. Uses the *precomputed* contract — train
+return + RSI + ATR features. Uses the *precomputed* contract, train
 once on the IS slice, predict probabilities for every bar of the full
 series, attach as a `pred` column, then threshold inside the
 strategy function.
@@ -10,7 +10,7 @@ Why this pattern:
   - Train-on-IS / predict-everywhere is the right discipline: the
     strategy function only ever reads `pred` shifted by one bar
     (`shift(1)`), so the model's fit-window seeing future test bars
-    would still be a look-ahead bug — but we control that by fitting
+    would still be a look-ahead bug, but we control that by fitting
     only on the IS slice the engine declares.
   - All features the model trains on are themselves shifted by one bar
     so each bar's feature row contains only data available at that
@@ -94,7 +94,7 @@ def _attach_predictions(df: pd.DataFrame) -> pd.DataFrame:
     X_train, y_train = X_train.loc[common], y_train.loc[common]
 
     if len(X_train) < 100 or y_train.nunique() < 2:
-        # Degenerate fixture — fall back to constant 0.5 so the engine
+        # Degenerate fixture: fall back to constant 0.5 so the engine
         # still has a well-defined `pred` column. Pure stand-in.
         df = df.copy()
         df[PRED_COL] = 0.5
@@ -126,7 +126,7 @@ def ml_logreg_signals(df: pd.DataFrame, lb: int) -> np.ndarray:
 
 
 bt.create_raw_signals = ml_logreg_signals
-# Predictions don't sweep a lookback — pin LB to a single value to skip
+# Predictions don't sweep a lookback: pin LB to a single value to skip
 # wasted optimiser cycles.
 bt.LOOKBACK_RANGE = (50, 52)
 # Default OOS_CANDLES (90,000) exceeds the bundled SOLUSDT 1h dataset

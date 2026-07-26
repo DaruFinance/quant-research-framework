@@ -1,8 +1,8 @@
-"""Tests for the panel data loader (item #1, Phase 2).
+"""Tests for the panel data loader (Phase 2).
 
 Verification gates:
 
-G1 (parity): pure new code path — none of the four parity scripts are
+G1 (parity): pure new code path, none of the four parity scripts are
    affected. Verified by running them after this item lands; here we
    only assert the loader's contract.
 
@@ -184,7 +184,7 @@ def test_empty_paths_dict_raises():
 
 
 # ---------------------------------------------------------------------------
-# Item #4: cross-asset regime detector lookahead leak harness (HIGH-RISK).
+# cross-asset regime detector lookahead leak harness (HIGH-RISK).
 # For every (victim, witness) pair and every T in a 50-point grid, polluting
 # `victim`'s data at rows > T must leave `witness`'s regime labels at
 # rows <= T bit-identical. Both default detectors are leak-free by
@@ -267,14 +267,13 @@ def test_panel_regime_market_broadcasts_market_asset_labels():
 def test_cross_asset_leak_harness_catches_known_leak():
     """The 50-T pollute battery must catch a deliberately-leaking
     panel detector. We register a detector that copies the NEXT bar's
-    SOL close into BTC's regime — a clear cross-asset future-read —
-    and assert ``_assert_no_cross_asset_leak`` raises with the
+    SOL close into BTC's regime (a clear cross-asset future-read)     and assert ``_assert_no_cross_asset_leak`` raises with the
     offending (victim, witness) pair in the message."""
     from backtester.panel import load_panel
     panel = load_panel(PANEL_PATHS)
 
     def leaky_detector(panel):
-        # BTC's "label" at t reads SOL.close at t+1 — a future leak
+        # BTC's "label" at t reads SOL.close at t+1: a future leak
         # across assets. Polluting SOL at >T must change BTC at <=T.
         sol_idx = panel.assets.index("SOL")
         sol = panel.ds["close"].values[:, sol_idx]
@@ -310,7 +309,7 @@ def test_panel_regime_market_rejects_missing_market_asset():
 def test_loader_no_lookahead_under_tail_pollution(tmp_path):
     """The loader is pure inner-join + alignment. Polluting the tail of
     one CSV with garbage rows (still in monotonically-increasing time)
-    must not change the data at earlier rows in the panel — the inner-
+    must not change the data at earlier rows in the panel, the inner-
     join semantics guarantee this, and we surface the guarantee as a
     test for the future plugin code that depends on it."""
     sol = pd.read_csv(PANEL_PATHS["SOL"])

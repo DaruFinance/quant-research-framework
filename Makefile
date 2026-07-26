@@ -1,10 +1,10 @@
 # Convenience targets for the Python reference.
 #
-#   make repro       — the <5-minute reproduction: the no-look-ahead property
+#   make repro      : the <5-minute reproduction: the no-look-ahead property
 #                      suite (Hypothesis) + the look-ahead leak demo.
-#   make leak        — just the look-ahead leak demo
-#   make invariants  — just the Hypothesis no-look-ahead property tests
-#   make test        — the full pytest suite
+#   make leak       : just the look-ahead leak demo
+#   make invariants : just the Hypothesis no-look-ahead property tests
+#   make test       : the full pytest suite
 #
 # CROSS-LANGUAGE PARITY (Python vs Rust) is driven from the Rust port repo,
 # which holds the parity harnesses:
@@ -26,6 +26,6 @@ test:
 
 repro: invariants leak
 	@echo
-	@echo "repro OK — the no-look-ahead property holds over the generated input"
+	@echo "repro OK, the no-look-ahead property holds over the generated input"
 	@echo "space, and the leak demo caught the planted forward-peek bug."
 	@echo "For cross-engine parity vs the Rust port: cd ../quant-research-framework-rs && make parity"

@@ -1,4 +1,4 @@
-"""Tests for basis loader (Phase 3 item #39)."""
+"""Tests for basis loader."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,7 +22,7 @@ def test_load_basis_basic():
 
 def test_load_basis_recompute_matches_input():
     """The fixture's basis_bp must agree with a fresh recompute to
-    well within the 0.01bp tolerance — this is what makes the loader
+    well within the 0.01bp tolerance, this is what makes the loader
     a reliable lookahead-screen for forward-looking sources."""
     df = load_basis(FIX)
     fresh = (df["close_perp"] - df["close_spot"]) / df["close_spot"] * 1e4

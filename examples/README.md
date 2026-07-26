@@ -1,7 +1,7 @@
 # Examples: adding your own strategy
 
-The whole backtester — IS/OOS split, optimiser, walk-forward, robustness,
-Monte Carlo, trade export — lives in `backtester.py`. A **strategy** is the
+The whole backtester, IS/OOS split, optimiser, walk-forward, robustness,
+Monte Carlo, trade export, lives in `backtester.py`. A **strategy** is the
 one function that takes an OHLC DataFrame and returns raw long/short
 intents. Everything else is shared.
 
@@ -22,8 +22,8 @@ where each element is:
 
 | Value | Meaning |
 |------:|---------|
-| `+1`  | **Long intent** at this bar — open or hold a long |
-| `-1`  | **Short intent** at this bar — open or hold a short |
+| `+1`  | **Long intent** at this bar, open or hold a long |
+| `-1`  | **Short intent** at this bar, open or hold a short |
 |  `0`  | **No intent** (indicator not warmed up, or no crossover this bar) |
 
 The `lb` argument is the look-back length the optimiser is sweeping over.
@@ -47,32 +47,32 @@ Two equivalent ways to express a crossover:
 
 2. **Cross-events** (sparse). Set `raw[i] = +1` **only** at the bar of a
    cross-up (`fast_prev > slow_prev & fast_prev_prev <= slow_prev_prev`),
-   `-1` only at a cross-down, `0` in between. This is what the proprietary
-   `run_strategies.py` spec builder does and what the ATR example here does.
+   `-1` only at a cross-down, `0` in between. That is what the ATR example
+   here does.
 
-Both produce the same trades — `parse_signals` flip-detects at position
-changes — but the sparse form is tidier when you want to stack a
+Both produce the same trades, `parse_signals` flip-detects at position
+changes, but the sparse form is tidier when you want to stack a
 confluence filter on top.
 
 ### Adding a confluence
 
 A "confluence" is just a boolean filter you AND with your primary signal
-before returning. Any extra indicator — an RSI threshold, a volatility
-floor, an MTF agreement test — is a line of code in your strategy
+before returning. Any extra indicator, an RSI threshold, a volatility
+floor, an MTF agreement test, is a line of code in your strategy
 function. See `atr_cross/atr_cross.py` for a worked RSI ≥ 50 example.
 
 ## Running
 
 The examples inherit every config knob (fees, slippage, SL/TP, WFO trigger,
 robustness scenarios, Monte Carlo, etc.) from `backtester.py`. Edit the
-constants at the top of that file to change any of them — no example
+constants at the top of that file to change any of them, no example
 changes required.
 
 ```bash
-# Reference strategy (EMA crossover) — this is backtester.py
-python backtester.py
+# Reference strategy (EMA crossover): the engine's own default
+python -m backtester
 
-# ATR-cross with RSI confluence — this folder
+# ATR-cross with RSI confluence: this folder
 python examples/atr_cross/atr_cross.py
 
 # Minimal end-to-end: custom strategy -> IS/OOS -> WFO -> overfitting report
@@ -81,7 +81,7 @@ python examples/end_to_end/end_to_end.py
 
 # Point either one at a different CSV without editing sources
 python examples/atr_cross/atr_cross.py path/to/ohlc.csv
-BT_CSV=path/to/ohlc.csv python backtester.py
+BT_CSV=path/to/ohlc.csv python -m backtester
 ```
 
 The `BT_CSV` env var is the escape hatch that lets strategy scripts
@@ -96,14 +96,14 @@ override the default `CSV_FILE` without touching `backtester.py`.
 4. `python examples/my_strategy/my_strategy.py`.
 
 If you need an indicator that isn't in `indicators_tradingview.py`, add
-it there or inline it in your strategy file — the helpers in that module
+it there or inline it in your strategy file, the helpers in that module
 are short and easy to extend.
 
 ## Plugging in a machine-learning model
 
 The `(df, lb) -> np.ndarray[int8]` contract is intentionally narrow so any
-prediction source — sklearn, lightgbm, torch, an ONNX runtime, an external
-service — fits as long as you can turn its output into +1 / -1 / 0 per bar.
+prediction source, sklearn, lightgbm, torch, an ONNX runtime, an external
+service, fits as long as you can turn its output into +1 / -1 / 0 per bar.
 
 There are two patterns. They are not mutually exclusive; pick whichever
 matches how you already train.
@@ -169,17 +169,17 @@ provide.
 Constraints:
 
 * `len(REGIME_LABELS)` must be in `{2, 3, 4, 5}`.
-* `detect_regimes(df)` must be free of look-ahead — only use information
+* `detect_regimes(df)` must be free of look-ahead: only use information
   available at bar `i-1` or earlier when labelling bar `i`.
 * The series your detector returns must be indexed the same as `df`
   (default `RangeIndex` from `load_ohlc`).
 
 `examples/regime_custom/regime_custom.py` shows three demos:
 
-1. **2-regime volatility detector** — Calm vs Volatile by 50-bar realised
+1. **2-regime volatility detector**: Calm vs Volatile by 50-bar realised
    vol vs its 250-bar median.
-2. **4-regime trend × volatility** — CalmUp / CalmDown / VolUp / VolDown.
-3. **5-regime ML-style detector** — quantile bucketing of (return, vol),
+2. **4-regime trend × volatility**: CalmUp / CalmDown / VolUp / VolDown.
+3. **5-regime ML-style detector**: quantile bucketing of (return, vol),
    structured to be drop-in-replaceable with a fitted scikit-learn
    `KMeans` / `GaussianMixture` / HMM.
 
@@ -190,7 +190,7 @@ inference inside `detect_regimes(df)`, return labels.
 ## A Rust port exists too
 
 If you want the same pipeline but ~24× faster, see
-[`quant-research-framework-rs`](https://github.com/DaruFinance/quant-research-framework-rs) — it
+[`quant-research-framework-rs`](https://github.com/DaruFinance/quant-research-framework-rs), it
 ships the same IS/OOS + WFO + robustness loop as `backtester.py` and has
 a parallel `examples/atr_cross.rs` that produces bit-identical IS/OOS
 numbers to this example when run on the same CSV.

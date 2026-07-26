@@ -1,9 +1,8 @@
 """Invariant-test framework for lookahead-free declarations.
 
-Item #14 of the v2 extension plan: a registry-driven pollute-and-verify
-harness so every new state-bearing function (regime detectors, spread
-estimators, screeners, quoters in items #4, #9, #10, #11, #21, …)
-gets a no-look-ahead property test automatically.
+A registry-driven pollute-and-verify harness, so that every new
+state-bearing function (regime detectors, spread estimators, screeners,
+quoters) gets a no-look-ahead property test automatically.
 
 Usage
 -----
@@ -25,12 +24,12 @@ to the un-polluted call.
 Pollution kinds
 ---------------
 
-- ``"ohlc_df"`` — OHLC DataFrame; pollutes ``close/open/high/low`` at
+- ``"ohlc_df"``: OHLC DataFrame; pollutes ``close/open/high/low`` at
   rows ``>= cut`` with NaN.
-- ``"panel"`` — long-format Parquet-style panel
+- ``"panel"``: long-format Parquet-style panel
   (``time, asset, open, high, low, close``); pollutes rows where
   ``time >= cut_time`` (caller passes a time index, not a row index).
-- ``"series"`` — 1-D Series of floats; pollutes positions ``>= cut``
+- ``"series"``: 1-D Series of floats; pollutes positions ``>= cut``
   with NaN.
 
 Adding a new data kind is a one-line addition to ``_default_pollute``.

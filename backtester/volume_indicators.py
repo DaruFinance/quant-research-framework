@@ -1,4 +1,4 @@
-"""Volume indicators (item #2, v0.6.0). Python reference for
+"""Volume indicators (v0.6.0). Python reference for
 `src/volume.rs`. No look-ahead: every value at index i uses only bars 0..=i.
 Seeds and session-reset boundaries are specified IDENTICALLY to the Rust
 module so the two engines match within f64 noise (parity gate 1e-3 paper /

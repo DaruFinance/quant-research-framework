@@ -1,4 +1,4 @@
-"""Tests for the neutralization primitives (item #7, Phase 2)."""
+"""Tests for the neutralization primitives (Phase 2)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -201,7 +201,7 @@ def test_beta_neutral_5_rebalances_residual_beta_under_5pct():
             f">= 0.05; betas={betas} w={w}"
         )
 
-    # Sanity: at least some non-trivial neutralization happened —
+    # Sanity: at least some non-trivial neutralization happened :
     # i.e. the market-leg weight differs from the raw -1.0.
     for end, betas, w, _ in rebalances:
         assert w[market_idx] != raw[market_idx], (

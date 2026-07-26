@@ -1,7 +1,7 @@
 """Hypothesis-based property tests for the strategy contract.
 
 These complement the example-based tests in `test_invariants.py`
-(which use fixed seeds — kept as regression cases for specific bugs)
+(which use fixed seeds, kept as regression cases for specific bugs)
 by letting Hypothesis search for counter-examples across a generated
 input space, with shrinking on failure.
 
@@ -37,7 +37,7 @@ _MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "30"))
 
 
 # ---------------------------------------------------------------------------
-# Item #46: hold-period cap. Pure index arithmetic (idx and ent_bar
+# hold-period cap. Pure index arithmetic (idx and ent_bar
 # both at-or-before this bar), so trivially lookahead-free.
 # ---------------------------------------------------------------------------
 @given(
@@ -78,7 +78,7 @@ def test_max_hold_bars_no_leak_property(seed: int, n: int, lb: int, max_hold: in
 
 def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
     """MAX_HOLD_BARS=0 (default) must produce bit-identical output to
-    the pre-#46 kernel — the in-loop check is guarded by `max_hold_bars
+    the pre-#46 kernel, the in-loop check is guarded by `max_hold_bars
     > 0` and must not perturb any trade when off. Run a small fixture
     twice (default vs explicit 0) and assert trade lists equal."""
     df = bt.load_ohlc("tests/fixtures/sol_1h_30000_31000.csv")
@@ -99,12 +99,12 @@ def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
 
 
 # ---------------------------------------------------------------------------
-# Item #14: invariant-registry harness self-tests.
+# invariant-registry harness self-tests.
 # ---------------------------------------------------------------------------
 def test_harness_catches_known_leak():
     """A deliberately leaky function must trip assert_no_lookahead.
 
-    Constructs a fake regime detector that returns ``close.shift(-1)`` —
+    Constructs a fake regime detector that returns ``close.shift(-1)``,
     i.e. uses tomorrow's price to label today. The harness should detect
     that polluting future rows changes the output for earlier rows and
     raise AssertionError naming the offending invariant.
@@ -112,7 +112,7 @@ def test_harness_catches_known_leak():
     from backtester.invariants import InvariantSpec, assert_no_lookahead
 
     def leaky_detector(df):
-        # Shifts the NEXT bar's close back into today's label — clear leak.
+        # Shifts the NEXT bar's close back into today's label: clear leak.
         return df["close"].shift(-1).fillna(0.0)
 
     spec = InvariantSpec(name="leaky_sentinel", func=leaky_detector,
@@ -139,7 +139,7 @@ def test_harness_passes_lookahead_free_function():
     from backtester.invariants import InvariantSpec, assert_no_lookahead
 
     def clean_detector(df):
-        # 20-bar SMA threshold — uses only df.close up to and including
+        # 20-bar SMA threshold: uses only df.close up to and including
         # the labelled bar.
         sma = df["close"].rolling(20, min_periods=1).mean()
         return (df["close"] > sma).astype(int)
@@ -159,7 +159,7 @@ def test_registered_invariants_pass_default_pollute():
     from backtester.invariants import list_invariants, assert_no_lookahead
 
     specs = list_invariants()
-    assert specs, "registry is empty — default_regime_detector should register on import"
+    assert specs, "registry is empty, default_regime_detector should register on import"
     df = _df_from(seed=44, n=500)
     df["EMA_200"] = df["close"].ewm(span=200, adjust=False).mean()
     for spec in specs:
@@ -277,7 +277,7 @@ def test_trade_indices_well_formed_property(seed: int, n: int, lb: int):
 
 
 # ---------------------------------------------------------------------------
-# Property 3b: aggregate_legs (item #2) is pure data-only. Polluting the
+# Property 3b: aggregate_legs is pure data-only. Polluting the
 # tail of the input leg list at positions >= T cannot change the first T
 # Trade groups in the output. Pure lookahead-freeness check on the
 # aggregation layer that sits between the kernel's per-leg 9-tuples and
@@ -328,7 +328,7 @@ def test_aggregate_legs_no_leak_property(seed: int, n: int, cut_frac: float):
 
 
 # ---------------------------------------------------------------------------
-# Property 3c: item #3 cost decomposition identity. For every trade leg the
+# Property 3c: cost decomposition identity. For every trade leg the
 # kernel emits, gross_pnl - fee - slippage - funding == net_pnl to floating-
 # point tolerance, AND polluting the cost columns at positions > T cannot
 # corrupt the cost values stored in Leg objects from positions <= T.

@@ -1,7 +1,7 @@
-Using bundled dataset: /home/daru/quant-research-framework-rs-v2/data/SOLUSDT_1h.csv
-Python repo: /home/daru/quant-research-framework-v2
-Rust  repo: /home/daru/quant-research-framework-rs-v2
-CSV       : /home/daru/quant-research-framework-rs-v2/data/SOLUSDT_1h.csv
+Using bundled dataset: $QRF_RS_DIR/data/SOLUSDT_1h.csv
+Python repo: $QRF_PY_DIR
+Rust  repo: $QRF_RS_DIR
+CSV       : $QRF_RS_DIR/data/SOLUSDT_1h.csv
 Tolerance : 0.1%
 
 Running Python...

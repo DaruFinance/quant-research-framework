@@ -1,4 +1,4 @@
-"""Tests for the pair / spread screener (item #9, Phase 3 — HIGH-RISK)."""
+"""Tests for the pair / spread screener (Phase 3, HIGH-RISK)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -42,7 +42,7 @@ def test_engle_granger_returns_pvalue_and_beta(panel):
 
 def test_engle_granger_cointegrates_btc_eth_on_fixture(panel):
     """DS-PAIR-BTCETH was specifically chosen as a cointegrating
-    window — ADF p-value on the full window must be < 0.05."""
+    window, ADF p-value on the full window must be < 0.05."""
     btc = panel.ds["close"].values[:, panel.assets.index("BTC")]
     eth = panel.ds["close"].values[:, panel.assets.index("ETH")]
     p, _ = engle_granger(btc, eth)

@@ -1,4 +1,4 @@
-"""Long-short basket primitive (item #8, Phase 2).
+"""Long-short basket primitive (Phase 2).
 
 A panel-level strategy that:
 1. Evaluates an alpha function at the rebalance bar (function gets
@@ -8,7 +8,7 @@ A panel-level strategy that:
 3. Selects the top ``n_long`` as longs and the bottom ``n_short`` as
    shorts; remaining assets get weight 0.
 4. Builds raw weights (+1 for each long, -1 for each short).
-5. Applies one of the item #7 neutralizations (``dollar`` / ``beta``
+5. Applies one of the neutralizations (``dollar`` / ``beta``
    / ``sigma``).
 6. Returns per-asset position weights as a dict ``{asset: weight}``.
 
@@ -66,7 +66,7 @@ class LongShortBasket:
         ``alpha_fn(panel, t_idx)``. Must read only ``<= t_idx``.
     neutralize_mode
         One of ``"dollar"``, ``"beta"``, ``"sigma"``. Drives the
-        post-ranking weight construction (item #7).
+        post-ranking weight construction.
     n_long, n_short
         Number of top / bottom alpha-ranked assets to enter long /
         short.
@@ -99,7 +99,7 @@ class LongShortBasket:
     def positions(self, panel: PanelData, t_idx: int) -> Dict[str, float]:
         """Return per-asset weights as ``{asset: weight}``.
 
-        Reads only ``panel`` cells at row indices ``<= t_idx`` —
+        Reads only ``panel`` cells at row indices ``<= t_idx``,
         consult the alpha at ``t_idx`` and the returns window
         ``[t_idx - returns_lookback, t_idx)``.
         """
@@ -121,7 +121,7 @@ class LongShortBasket:
             return {a: 0.0 for a in panel.assets}
 
         # Argsort ignoring NaNs by mapping them to -inf for shorts /
-        # +inf for longs — they fall to the bottom of the ranking
+        # +inf for longs: they fall to the bottom of the ranking
         # automatically.
         order_asc = np.argsort(np.where(np.isnan(alpha), np.inf, alpha))
         order_desc = order_asc[::-1]

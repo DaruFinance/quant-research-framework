@@ -1,9 +1,9 @@
-"""Item #1 — IS parameter-robustness isosurface: dense in-sample objective grid
+"""IS parameter-robustness isosurface: dense in-sample objective grid
 emit. OPT-IN, parity-safe.
 
 Re-implements the optimiser's per-cell evaluate math (__init__.py:1697-1776
-classic; :2291-2360 regime) verbatim — same RRR probe, same re-run at the chosen
-RRR, same met[metric] — over the DENSE lookback range (and an optional SL grid)
+classic; :2291-2360 regime) verbatim, same RRR probe, same re-run at the chosen
+RRR, same met[metric], over the DENSE lookback range (and an optional SL grid)
 instead of the sparse coarse+fine subset, keeping every cell. Never calls
 optimiser(); never mutates its behaviour. Gated OFF by default
 (EMIT_OPT_SURFACE) so importing this module and leaving the flag off leaves
@@ -196,7 +196,7 @@ def _eval_cell_regime(bt, dfi, regimes, ema20, slow_emas, best_lbs,
 
 def emit_surface_regime(bt, is_df, best_lbs, window_idx: str,
                         write_header: bool) -> None:
-    """Dense regime IS surface for one WFO window — one grid block per
+    """Dense regime IS surface for one WFO window, one grid block per
     (window, present-regime). `best_lbs` = the optimiser's FINAL per-regime
     pick (threaded from the caller). Rebuilds the same EMA scaffold the regime
     optimiser builds (__init__.py:2261-2280)."""

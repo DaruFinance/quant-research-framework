@@ -5,7 +5,7 @@
 [![parity](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml)
 [![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
 [![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798594.svg)](https://doi.org/10.5281/zenodo.19798594)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798593.svg)](https://doi.org/10.5281/zenodo.19798593)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
 
@@ -15,7 +15,7 @@ It answers one question: *does an apparent edge survive out-of-sample evaluation
 
 ## Two engines, one spec
 
-This repository is the **Python reference** — the readable specification. A separate **Rust port** re-implements it for speed (23.8–57× faster, 33–65× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red — the correctness claim is *enforced, not asserted*.
+This repository is the **Python reference**, the readable specification. A separate **Rust port** re-implements it for speed (23.8–57× faster, 33–65× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red: the correctness claim is *enforced, not asserted*.
 
 ```
                 ┌────────────────────────────────────────────────┐
@@ -53,7 +53,7 @@ make repro
 [FAIL] buggy (deliberate close.shift(-5) peek): 4 of 400 bars affected by post-bar-400 pollution; first leak at bar 395, last at bar 398.
 ```
 
-The cross-engine parity surfaces (Python vs Rust — 56/56 · 98/98 · 56/56 metric points at `1e-3`) are driven from the [Rust port repo](https://github.com/DaruFinance/quant-research-framework-rs); run `make parity` there.
+The cross-engine parity surfaces (Python vs Rust: 56/56 · 98/98 · 56/56 metric points at `1e-3`) are driven from the [Rust port repo](https://github.com/DaruFinance/quant-research-framework-rs); run `make parity` there.
 
 ## What this is / what it isn't
 
@@ -61,9 +61,9 @@ The cross-engine parity surfaces (Python vs Rust — 56/56 · 98/98 · 56/56 met
 
 **It isn't:**
 - **Not alpha.** The bundled strategies (EMA-cross, ATR-cross, …) are plumbing to exercise the engine, not trade signals. There is no edge here to deploy.
-- **Not live trading.** No broker connectivity, order management, or execution — it evaluates strategies on historical bars.
+- **Not live trading.** No broker connectivity, order management, or execution: it evaluates strategies on historical bars.
 - **Tested on crypto, FX, and synthetic GBM only.** SOL/BTC/DOGE-USDT, EUR/USD, USD/JPY, and a GBM generator. Equities, futures, and options are untried.
-- **Parity-gated on the core surfaces only.** The stationary-bootstrap module (`backtester/bootstrap.py`) and the `examples/ml_*` strategies are Python-only — no Rust counterpart, no cross-engine check.
+- **Parity-gated on the core surfaces only.** The stationary-bootstrap module (`backtester/bootstrap.py`) and the `examples/ml_*` strategies are Python-only: no Rust counterpart, no cross-engine check.
 
 ## Quick Start
 
@@ -74,6 +74,17 @@ pip install -r requirements.txt
 python gen_synthetic.py
 BT_CSV=data/SYNTHETIC.csv python -m backtester
 ```
+
+The same thing from PowerShell:
+
+```powershell
+pip install -r requirements.txt
+python gen_synthetic.py
+$env:BT_CSV = "data/SYNTHETIC.csv"; python -m backtester
+```
+
+No network and no market data required: the generator writes a deterministic
+GBM series and the run prints the full IS / OOS / walk-forward metric block.
 
 For real market data, swap the generator for a download:
 
@@ -91,54 +102,54 @@ Note: the framework was repackaged from a single `backtester.py` script into a `
 
 ## What's Included
 
-- **`backtester/`** — the engine package, restructured in v0.3.0 from the
+- **`backtester/`**: the engine package, restructured in v0.3.0 from the
   legacy single-file `backtester.py` script. Sub-modules:
-  - `backtester/__init__.py` — the engine: IS / OOS / WFO + robustness
+  - `backtester/__init__.py`: the engine: IS / OOS / WFO + robustness
     overlays + Monte Carlo + trade ledger export.
-  - `backtester/__main__.py` — `python -m backtester` CLI entry point.
-  - `backtester/indicators.py` — TradingView-style indicator helpers
+  - `backtester/__main__.py`: `python -m backtester` CLI entry point.
+  - `backtester/indicators.py`: TradingView-style indicator helpers
     (EMA, SMA, RSI, ATR, MACD, Stochastic).
-  - `backtester/dsr.py` — Bailey & López de Prado (2014) Deflated Sharpe
+  - `backtester/dsr.py`: Bailey & López de Prado (2014) Deflated Sharpe
     Ratio utility.
 
-- **`binance_ohlc_downloader.py`** — download and format Binance OHLC
+- **`binance_ohlc_downloader.py`**: download and format Binance OHLC
   candles into the CSV format the engine reads.
 
-- **`gen_synthetic.py`** — GBM-based synthetic OHLC generator. No
+- **`gen_synthetic.py`**: GBM-based synthetic OHLC generator. No
   network required; writes `data/SYNTHETIC.csv` in the same format the
   Binance downloader emits.
 
-- **`indicators_tradingview.py`** — backwards-compatibility shim that
+- **`indicators_tradingview.py`**: backwards-compatibility shim that
   re-exports `backtester.indicators`. Pre-v0.3.0 user scripts that do
   `from indicators_tradingview import compute_atr` keep working unchanged.
 
-- **`examples/`** — strategy and ML examples + parallel runner + the
+- **`examples/`**: strategy and ML examples + parallel runner + the
   walkthrough notebook:
-  - [`examples/atr_cross/`](examples/atr_cross) — ATR-cross with an
+  - [`examples/atr_cross/`](examples/atr_cross): ATR-cross with an
     RSI ≥ 50 confluence (worked-example strategy).
-  - [`examples/regime_custom/`](examples/regime_custom) — three
+  - [`examples/regime_custom/`](examples/regime_custom): three
     pluggable regime detectors (vol2, vol4, ml5).
   - [`examples/ml_precomputed/`](examples/ml_precomputed) and
-    [`examples/ml_callback/`](examples/ml_callback) — two ML-strategy
+    [`examples/ml_callback/`](examples/ml_callback), two ML-strategy
     integration patterns against the `(df, lb) -> int8[]` contract.
-  - [`examples/ml_sklearn/`](examples/ml_sklearn) — scikit-learn
+  - [`examples/ml_sklearn/`](examples/ml_sklearn): scikit-learn
     classifier wired into the strategy contract.
-  - [`examples/ml_regime_kmeans/`](examples/ml_regime_kmeans) —
+  - [`examples/ml_regime_kmeans/`](examples/ml_regime_kmeans),
     KMeans-based regime detector matching the `detect_regimes()` API.
-  - [`examples/batch_runner/`](examples/batch_runner) — multiprocess
+  - [`examples/batch_runner/`](examples/batch_runner): multiprocess
     runner for sweeping a parameter grid in parallel.
   - [`examples/notebook/walkthrough.ipynb`](examples/notebook/walkthrough.ipynb)
-    — the 10-cell tour referenced by the Binder badge above.
-  - [`examples/README.md`](examples/README.md) — the `(df, lb)` raw-signal
+   The 10-cell tour referenced by the Binder badge above.
+  - [`examples/README.md`](examples/README.md): the `(df, lb)` raw-signal
     contract spelled out.
 
-- **`docs/`** — Sphinx + autodoc API reference (Furo theme), built and
+- **`docs/`**: Sphinx + autodoc API reference (Furo theme), built and
   published to GitHub Pages by `.github/workflows/docs.yml`.
 
-- **`tests/`** — pytest suite (32 tests, including Hypothesis property
+- **`tests/`**: pytest suite (32 tests, including Hypothesis property
   tests on `parse_signals` and `walk_forward_regime` invariants).
 
-- **`binder/`** — Binder configuration (`requirements.txt`,
+- **`binder/`**: Binder configuration (`requirements.txt`,
   `runtime.txt`) for the launchable notebook.
 
 ---
@@ -168,7 +179,7 @@ See [`examples/README.md`](examples/README.md) for the full contract and `exampl
   `WFO_TRIGGER_MODE` ∈ {`candles`, `trades`}, `WFO_TRIGGER_VAL`)
 - Aggregated WFO performance curve + replication checks
 - **WFO + regime segmentation**: WFO walks its standard cadence; the
-  per-regime LB just rotates inside each window — fixed in v0.2.0 (was
+  per-regime LB just rotates inside each window, fixed in v0.2.0 (was
   previously re-anchoring the IS window on every regime change).
 
 ### Realism Controls
@@ -197,9 +208,9 @@ See [`examples/README.md`](examples/README.md) for the full contract and `exampl
 - The signal contract `(df, lb) -> np.ndarray[int8]` is unchanged, so
   any model that can produce per-bar long/short scores plugs in.
 - Two patterns shipped:
-  - [`examples/ml_precomputed/`](examples/ml_precomputed) — train
+  - [`examples/ml_precomputed/`](examples/ml_precomputed): train
     offline, attach a `pred` column, threshold inside the strategy fn.
-  - [`examples/ml_callback/`](examples/ml_callback) — keep a model in
+  - [`examples/ml_callback/`](examples/ml_callback): keep a model in
     memory and call `predict(features)` per bar (online / stateful).
 
 ### Robustness / Stress Tests
@@ -245,21 +256,28 @@ Rust port reproduces every IS/OOS/baseline/optimised/WFO metric line
 within `1e-3` relative tolerance against this Python reference on three
 independent surfaces:
 
-- **Default config (56/56 metric points)** — verified by
+- **Default config (56/56 metric points)**: verified by
   [`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py).
-- **Regime + WFO (98/98 metric points)** — verified by
+- **Regime + WFO (98/98 metric points)**: verified by
   [`tools/parity_regime.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_regime.py)
   on the Rust port's v0.3.2 release.
-- **Forex mode (56/56 metric points on EURUSD 1h)** — verified by
+- **Forex mode (56/56 metric points on EURUSD 1h)**: verified by
   [`tools/parity_forex.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_forex.py).
 
 These three are the original parity surfaces; v0.6.0 adds more (volume, shared
 indicators, IS-surface, overfitting statistics). Maximum observed relative
 deviation on the default surfaces is below `5e-5` (the metric ledger's `%.4f`
 print precision floor), 20× tighter than the declared `1e-3` tolerance. We
-avoid the term *byte-identical* throughout: parity is tolerance-bounded by
-construction, not bit-equality, and is enforced continuously by the
-`parity_*.py` suite in CI.
+avoid the term *byte-identical* for the cross-language axis: parity there is
+tolerance-bounded by construction, not bit-equality, and is enforced
+continuously by the `parity_*.py` suite in CI.
+
+Cross-*architecture* parity, by contrast, **is** byte-identical. The Rust
+port compiled for `aarch64-unknown-linux-gnu` reproduces every printed
+metric digit exactly against committed x86_64 goldens, across all six
+bundled datasets (196 metric lines each, 1,176 in total), gated in CI by
+[`tools/parity_arch.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_arch.py)
+on an x86_64 drift guard, a QEMU aarch64 run, and a native ARM runner.
 
 It runs **23.8–57× faster** (Python reference vs Rust port) and uses **33–65× less memory**:
 
@@ -272,7 +290,7 @@ It runs **23.8–57× faster** (Python reference vs Rust port) and uses **33–6
 
 (Median warm wall-clock over n=5 runs after one untimed warm-up, peak RSS as
 the max observed, on the bundled `SOLUSDT_1h.csv`. †The 5,000-bar 232× is a
-measurement-floor artifact — Rust there sits at the timer resolution — so the
+measurement-floor artifact (Rust there sits at the timer resolution) so the
 steady-state figure is the 48k row, 23.8×. Same harness and numbers as the
 paper; reproduce with `python tools/bench_paper.py --runs 5` from the sibling
 Rust repo.)
@@ -282,7 +300,7 @@ Rust repo.)
 What this framework emphasises that mainstream open-source alternatives do
 not (verified against primary docs as of 2026-04):
 
-| Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language byte-parity tests |
+| Framework              | License                  | Built-in WFO | Per-regime LB optimisation | Strict-LAH property tests | Cross-language parity tests |
 |------------------------|--------------------------|:------------:|:--------------------------:|:-------------------------:|:--------------------------------:|
 | **this** (Python + Rust) | Apache-2.0                    | ✓            | ✓                          | ✓                         | ✓                                |
 | [vectorbt][vbt]        | Apache-2.0 + Commons     | ✓ (Splitter) | ✗                          | ✗                         | n/a                              |

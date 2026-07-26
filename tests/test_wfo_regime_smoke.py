@@ -4,7 +4,7 @@ Boots the engine with small IS/OOS/WFO sizes so the test runs in seconds,
 flips USE_WFO and USE_REGIME_SEG on together, and asserts:
 
   1. The walk completes without raising.
-  2. WFO window boundaries align with WFO_TRIGGER_VAL — i.e. they are NOT
+  2. WFO window boundaries align with WFO_TRIGGER_VAL: i.e. they are NOT
      re-anchored on regime changes (the bug fixed in v0.2.0).
   3. Per-regime LB rotation actually happens inside OOS (signals are
      produced from at least two distinct LBs across the run).
@@ -71,11 +71,11 @@ def test_wfo_with_regime_completes_and_keeps_cadence(small_df, monkeypatch):
     #    of how often the regime label flips inside OOS. The v0.1.x bug
     #    used regime change indices to slice OOS, which on synthetic data
     #    routinely produced 10+ stretches and therefore 10+ optimiser
-    #    calls — that's the regression this assertion catches.
+    #    calls: that's the regression this assertion catches.
     assert 2 <= len(captured_lbs) <= 4, (
         f"Expected 2..4 optimiser calls under v0.2.0 cadence "
         f"(1 initial + up to 3 windows for OOS=600 / TRIGGER=200), "
-        f"got {len(captured_lbs)} — regression to v0.1.x regime-driven cadence?"
+        f"got {len(captured_lbs)}, regression to v0.1.x regime-driven cadence?"
     )
 
     # 3. The optimiser produced a per-regime LB dict each window, with at

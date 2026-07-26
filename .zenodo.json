@@ -1,0 +1,30 @@
+{
+  "title": "quant-research-framework: a walk-forward backtester with ledger invariant tests and tolerance-bounded cross-language parity",
+  "description": "The Python reference half of a dual-engine walk-forward backtester. Strict no-look-ahead enforced by ledger-level invariant and property tests, walk-forward optimisation, regime segmentation, a four-axis robustness suite, Monte Carlo diagnostics and overfitting statistics. A Rust port reproduces its metric output within 1e-3 relative tolerance, checked in CI.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "apache-2.0",
+  "creators": [
+    {
+      "name": "Vieira Gatto, Daniel",
+      "orcid": "0009-0003-3226-5978"
+    }
+  ],
+  "keywords": [
+    "backtesting",
+    "walk-forward optimization",
+    "look-ahead bias",
+    "cross-language parity",
+    "differential testing",
+    "reproducible research",
+    "quantitative finance",
+    "python"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.19798591",
+      "relation": "isSourceOf",
+      "scheme": "doi"
+    }
+  ]
+}

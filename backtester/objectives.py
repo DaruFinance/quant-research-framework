@@ -1,8 +1,8 @@
-"""Multi-term IS objective functions (item #44, Phase 2).
+"""Multi-term IS objective functions (Phase 2).
 
 Default scoring in the single-asset optimiser is one of
 ``ROI / PF / Sharpe / WinRate / Exp / MaxDrawdown / Consistency``
-selected via the ``OPT_METRIC`` module constant. Item #44 adds a
+selected via the ``OPT_METRIC`` module constant, which adds a
 composite that combines:
 
     score = sortino - lambda * |corr(strategy_rets, benchmark_rets)|

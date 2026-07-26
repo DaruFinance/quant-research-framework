@@ -8,7 +8,7 @@ noise; re-run; signals at bars [..k) must match. A leaky strategy diverges.
 import os, sys
 
 # Portable repo resolution (matches the paper's reproducibility appendix):
-# QRF_PYTHON_REPO / QRF_RUST_REPO env vars, else sensible fallbacks — the
+# QRF_PYTHON_REPO / QRF_RUST_REPO env vars, else sensible fallbacks: the
 # Python repo is this file's grandparent (listings/ sits in the repo root),
 # the Rust repo its sibling. No hardcoded absolute paths.
 _HERE = os.path.dirname(os.path.abspath(__file__))

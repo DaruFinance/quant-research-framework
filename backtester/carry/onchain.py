@@ -1,4 +1,4 @@
-"""On-chain stream loader with snapshot-pinning (item #41, Phase 3).
+"""On-chain stream loader with snapshot-pinning (Phase 3).
 
 The critical property here is *snapshot pinning*: on-chain providers
 (Glassnode, CryptoQuant, blockchain.info) frequently revise historical
@@ -53,13 +53,13 @@ def load_onchain(
 
     .. warning::
        Pandas (≥ 2.0) drops ``DataFrame.attrs`` whenever an operation
-       joins this frame with another frame whose ``attrs`` differ —
+       joins this frame with another frame whose ``attrs`` differ ,
        most notably :func:`pandas.concat` and :func:`DataFrame.merge`
        with a fresh / different-source frame.  In practice this means
        a downstream join of an on-chain frame with bar data drops the
        pinning metadata silently.  ``copy()``, slicing, ``groupby``,
        and elementwise arithmetic preserve attrs in current pandas,
-       but treat that as incidental — capture the pinning fields
+       but treat that as incidental, capture the pinning fields
        into your own variables right after :func:`load_onchain`
        returns rather than relying on them surviving downstream.
        Same caveat applies to :func:`load_funding`, :func:`load_basis`,
