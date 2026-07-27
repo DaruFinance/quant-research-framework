@@ -15,7 +15,7 @@ It answers one question: *does an apparent edge survive out-of-sample evaluation
 
 ## Two engines, one spec
 
-This repository is the **Python reference**, the readable specification. A separate **Rust port** re-implements it for speed (23.8–57× faster, 33–65× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red: the correctness claim is *enforced, not asserted*.
+This repository is the **Python reference**, the readable specification. A separate **Rust port** re-implements it for speed (28.5–39× faster, 29–62× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red: the correctness claim is *enforced, not asserted*.
 
 ```
                 ┌────────────────────────────────────────────────┐
@@ -26,7 +26,7 @@ This repository is the **Python reference**, the readable specification. A separ
                 ┌───────────────▼──────┐  ┌──────▼───────────────┐
                 │  Python reference    │  │      Rust port       │
                 │  backtester/         │  │  (sibling repo, …-rs)│
-                │  (this repo, the spec)│ │   speed: 23.8–57×    │
+                │  (this repo, the spec)│ │   speed: 28.5–39×    │
                 └───────────────┬──────┘  └──────┬───────────────┘
                                 │ metrics        │ metrics
                                 ▼                ▼
@@ -279,21 +279,22 @@ bundled datasets (196 metric lines each, 1,176 in total), gated in CI by
 [`tools/parity_arch.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_arch.py)
 on an x86_64 drift guard, a QEMU aarch64 run, and a native ARM runner.
 
-It runs **23.8–57× faster** (Python reference vs Rust port) and uses **33–65× less memory**:
+It runs **28.5–39× faster** (Python reference vs Rust port) and uses **29–62× less memory**:
 
 | Bars   | Python warm (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
 |-------:|----------------:|---------:|---------:|----------------:|--------------:|
-|  5,000 |    2.32 ± 0.06  |    0.01  |  232×†   |             270 |           2.8 |
-| 15,000 |    2.85 ± 0.05  |    0.05  |  57.0×   |             273 |           4.2 |
-| 30,000 |    3.98 ± 0.09  |    0.12  |  33.2×   |             280 |           6.2 |
-| 48,000 |    5.71 ± 0.10  |    0.24  |  23.8×   |             294 |           8.8 |
+|  5,000 |    3.51 ± 8.6%  |   0.010  |   351×†  |             272 |           3.0 |
+| 15,000 |    4.35 ± 10.0% |   0.050  |  87.0×†  |             277 |           4.5 |
+| 30,000 |    5.86 ± 10.2% |   0.150  |  39.1×   |             280 |           7.2 |
+| 48,000 |    7.70 ± 11.5% |   0.270  |  28.5×   |             292 |          10.0 |
 
-(Median warm wall-clock over n=5 runs after one untimed warm-up, peak RSS as
-the max observed, on the bundled `SOLUSDT_1h.csv`. †The 5,000-bar 232× is a
-measurement-floor artifact (Rust there sits at the timer resolution) so the
-steady-state figure is the 48k row, 23.8×. Same harness and numbers as the
-paper; reproduce with `python tools/bench_paper.py --runs 5` from the sibling
-Rust repo.)
+(Median warm wall-clock over n=15 runs after one untimed warm-up, peak RSS as
+the max observed, on the bundled `SOLUSDT_1h.csv`. †The 5,000- and 15,000-bar
+rows are measurement-floor artifacts: `/usr/bin/time` resolves to 0.01 s, and
+at those sizes every Rust sample lands on one or two values, so the ratios are
+inflated by the timer as well as by fixed Python start-up. The steady-state
+figure is the 48k row, 28.5×. Same harness and numbers as the paper; reproduce
+with `python tools/bench_paper.py --runs 15` from the sibling Rust repo.)
 
 ## Comparison vs other open-source backtesters
 
