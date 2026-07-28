@@ -12,7 +12,7 @@ Execution flow:
 The implementation is designed to avoid look-ahead bias.
 """
 
-__version__ = "0.7.2"
+__version__ = "0.7.3"
 
 import os, math, random
 import time as pytime
