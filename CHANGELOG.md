@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-07-27
+
+### Fixed
+- Declared version now matches the release tag (0.7.1 shipped with 0.7.0
+  metadata in `Cargo.toml`/`pyproject.toml`/`CITATION.cff`).
+- `parity_ledger.py` no longer overrides `PIP_SIZE` for JPY pairs; the gate
+  now exercises the engine's own `resolve_pip_size` rule.
+- README: the four-way combo surface is closed, not open; the USD/JPY ledger
+  divergence is listed with the others.
+
 ## [0.7.0] - 2026-07-26
 
 ### Fixed
