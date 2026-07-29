@@ -6,9 +6,9 @@ authors:
   - family-names: "Vieira Gatto"
     given-names: "Daniel"
     alias: "DaruFinance"
-    email: "77agdg@gmail.com"
-version: "0.7.3"
-date-released: "2026-07-26"
+    email: "daniel@daru.finance"
+version: "0.7.4"
+date-released: "2026-07-29"
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
 url: "https://doi.org/10.5281/zenodo.19798593"
 doi: 10.5281/zenodo.19798593

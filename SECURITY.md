@@ -27,7 +27,7 @@ ship a fix before disclosure.
 
 ## How to report
 
-Email **77agdg@gmail.com** with subject prefix `[security] qrf:`.
+Email **daniel@daru.finance** with subject prefix `[security] qrf:`.
 
 Include:
 
