@@ -7,8 +7,8 @@ authors:
     given-names: "Daniel"
     alias: "DaruFinance"
     email: "daniel@daru.finance"
-version: "0.7.4"
-date-released: "2026-07-29"
+version: "0.7.5"
+date-released: "2026-07-30"
 repository-code: "https://github.com/DaruFinance/quant-research-framework"
 url: "https://doi.org/10.5281/zenodo.19798593"
 doi: 10.5281/zenodo.19798593
