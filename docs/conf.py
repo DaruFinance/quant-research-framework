@@ -1,5 +1,6 @@
 """Sphinx configuration for the quant-research-framework docs."""
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -13,7 +14,10 @@ os.environ.setdefault("BT_CSV", "data_SOLUSDT_1h.csv")
 project = "quant-research-framework"
 author = "Daniel Vieira Gatto"
 copyright = "2026, Daniel Vieira Gatto"
-release = "0.4.0"
+release = re.search(
+    r'(?m)^version\s*=\s*"([^"]+)"',
+    (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"),
+).group(1)
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -36,6 +40,7 @@ intersphinx_mapping = {
     "numpy":  ("https://numpy.org/doc/stable/", None),
     "pandas": ("https://pandas.pydata.org/docs/", None),
 }
+intersphinx_timeout = 15
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

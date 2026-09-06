@@ -7,16 +7,24 @@ only data evaluated at bar i-1 (and earlier).
 Requires a df with a 'volume' column (load_ohlc auto-includes it when the CSV
 has a 6th 'volume' column; see backtester/__init__.py).
 
-    python examples/volume_strategies.py data/volume_fixture.csv
+    python examples/volume_strategies.py
+    python examples/volume_strategies.py path/to/ohlcv.csv
+
+Defaults to the bundled real SOL/USDT hourly OHLCV history. BT_CSV also
+overrides that path. To fetch another pair, run binance_ohlc_downloader.py
+with --volume to retain the sixth column.
 """
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, ".")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 from backtester.volume_indicators import (  # noqa: E402
     ny_session_resets,
     obv,
@@ -116,8 +124,12 @@ def relvol_breakout(df: pd.DataFrame, lb: int) -> np.ndarray:
 
 if __name__ == "__main__":
     from backtester import load_ohlc
-    path = sys.argv[1] if len(sys.argv) > 1 else "data/volume_fixture.csv"
+    path = sys.argv[1] if len(sys.argv) > 1 else os.environ.get(
+        "BT_CSV", str(ROOT / "data" / "SOLUSDT_1h.csv"))
     df = load_ohlc(path)
+    if "volume" not in df or not df["volume"].gt(0).any():
+        raise SystemExit("Volume strategies require positive real volume. "
+                         "Fetch OHLCV with binance_ohlc_downloader.py --volume.")
     for name, fn in [
         ("vol_confirmed_ema_cross", vol_confirmed_ema_cross),
         ("vwap_mean_reversion", vwap_mean_reversion),

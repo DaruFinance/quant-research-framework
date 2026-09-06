@@ -19,12 +19,12 @@ strategies tried in ONE in-sample optimisation (the distinct lookbacks
 evaluated by ``_optimiser_impl``), NOT a concatenation across WFO
 windows. ``len(trial_sharpes)`` is the trial count N for DSR/PSR/MinTRL.
 
-CRITICAL, Sharpe convention (Lens B D2/D6). DSR/PSR/MinTRL require the
-non-annualised per-observation estimator sqrt(T)*mean/std. The CHOSEN
-Sharpe is recomputed HERE from ``oos_returns`` in that convention; it is
-NOT taken from the engine's met_is['Sharpe'] (in-sample, possibly
-annualised). The haircut and MinBTL use the per-period SR = mean/std of
-the same OOS returns.
+DSR/PSR/MinTRL require mean/sample_std, with no sqrt(T) or annualisation.
+Each supplied trial Sharpe must be computed from that trial's own return
+observations, using the same observation type as ``oos_returns``. The
+engine supplies per-trade Sharpes even when its ranking uses bar Sharpe.
+The chosen Sharpe is recomputed from the pooled OOS trade returns here.
+The haircut and MinBTL retain their existing per-period SR convention.
 """
 from __future__ import annotations
 
@@ -38,28 +38,9 @@ from backtester import pbo as _pbo
 from backtester import haircut as _haircut
 
 
-def _scaled_sharpe(rets: np.ndarray) -> float:
-    """Non-annualised per-observation Sharpe sqrt(T)*mean/std(ddof=1),
-    matching the Bailey-LdP estimator (and multitest.py:103-105). 0.0 if
-    fewer than 2 finite obs or std<=0."""
-    r = rets[np.isfinite(rets)]
-    if r.size < 2:
-        return 0.0
-    sd = float(r.std(ddof=1))
-    if sd <= 0.0:
-        return 0.0
-    return float(math.sqrt(r.size) * r.mean() / sd)
-
-
 def _per_period_sr(rets: np.ndarray) -> float:
-    """Dimensionless per-bar SR = mean/std(ddof=1); 0.0 on degenerate."""
-    r = rets[np.isfinite(rets)]
-    if r.size < 2:
-        return 0.0
-    sd = float(r.std(ddof=1))
-    if sd <= 0.0:
-        return 0.0
-    return float(r.mean() / sd)
+    """Per-observation SR = mean/std(ddof=1); NaN on degenerate."""
+    return _dsr.sharpe_per_observation(rets)
 
 
 def emit(
@@ -77,14 +58,17 @@ def emit(
 
     Parameters
     ----------
-    trial_sharpes : distinct in-sample trial Sharpes (effective N).
-    oos_returns   : OOS per-bar return series of the chosen strategy.
+    trial_sharpes : distinct in-sample trial mean/sample_std values. Each
+                    uses its own returns, not the selected OOS count.
+    oos_returns   : pooled OOS return observations of the chosen strategy
+                    (per-trade when called by the engine).
                     The chosen Sharpe is recomputed FROM THIS series.
     sharpe_mode   : the engine's SHARPE_MODE that produced trial_sharpes;
-                    used only to WARN when the trial scale is annualised.
+                    used to identify a different optimisation objective.
     equity_matrix : (T, N) OOS-equity matrix for PBO/CSCV; None -> skip.
     pbo_S         : CSCV fold count (default 16, the paper value).
-    sr_benchmark  : benchmark Sharpe for PSR/MinTRL (sqrt(T)-scale).
+    sr_benchmark  : benchmark mean/sample_std for PSR/MinTRL, in the same
+                    observation unit as trial_sharpes and oos_returns.
     prob          : target confidence for MinTRL.
     haircut_freq  : periods/year for the haircut annualisation.
     haircut_method: {'bonferroni','bhy'} (default 'bhy').
@@ -97,17 +81,16 @@ def emit(
 
     # Recompute the chosen Sharpe FROM the OOS returns in the Bailey-LdP
     # convention so the statistic and the sample agree (Lens B D2).
-    sr_chosen = _scaled_sharpe(rets)
     sr_pp = _per_period_sr(rets)
+    sr_chosen = sr_pp
 
     print("  ---- Overfitting diagnostics (opt-in; non-parity lines) ----")
     print(f"  INFO | effective trials N={n_trials} (distinct strategies, "
-          f"NOT windows*combos)  |  OOS bars T={T}  |  "
-          f"SR_chosen(sqrtT)={sr_chosen:.4f}")
+          f"NOT windows*combos)  |  OOS observations T={T}  |  "
+          f"SR_chosen(per-observation)={sr_chosen:.4f}")
     if sharpe_mode != "trade":
-        print(f"  WARN | SHARPE_MODE={sharpe_mode!r}: trial Sharpes are "
-              f"annualised; DSR/PSR scale differs from the Bailey-LdP "
-              f"per-observation estimator. Read DSR/PSR with care.")
+        print(f"  INFO | SHARPE_MODE={sharpe_mode!r} ranks the optimiser; "
+              f"diagnostics use unscaled return-observation Sharpes.")
 
     # DSR
     try:
@@ -138,7 +121,7 @@ def emit(
         try:
             mbtl = _dsr.min_backtest_length(n_trials, abs(sr_pp))
             mbtl_s = f"{mbtl:.1f}" if math.isfinite(mbtl) else "inf"
-            print(f"  MBTL | N={n_trials}  SR_target(per-bar):{abs(sr_pp):6.4f}  "
+            print(f"  MBTL | N={n_trials}  SR_target(per-observation):{abs(sr_pp):6.4f}  "
                   f"min_obs={mbtl_s}  (have {T})")
         except Exception as e:                                # pragma: no cover
             print(f"  MBTL | unavailable: {e}")

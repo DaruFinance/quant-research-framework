@@ -1,5 +1,6 @@
 # Backtest outputs
 trade_list.csv
+*.csv.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -213,3 +214,4 @@ __marimo__/
 data/*.csv
 data/*.parquet
 data/*.feather
+!data/SOLUSDT_1h.csv

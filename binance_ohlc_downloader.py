@@ -86,6 +86,7 @@ class Args:
     rpm: int
     retries: int
     timeout: int
+    volume: bool = False
 
 
 def ts_ms_now() -> int:
@@ -123,12 +124,31 @@ def ms_to_iso(ms: int) -> str:
 CSV_HEADER = ["time", "open", "high", "low", "close"]
 
 
-def init_csv(path: str) -> None:
+def init_csv(path: str, volume: bool = False) -> None:
     ensure_parent_dir(path)
+    header = CSV_HEADER + (["volume"] if volume else [])
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         with open(path, mode="w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(CSV_HEADER)
+            writer.writerow(header)
+    else:
+        with open(path, newline="", encoding="utf-8") as f:
+            existing = next(csv.reader(f), [])
+        if existing != header:
+            raise ValueError(
+                f"CSV schema {existing!r} does not match requested {header!r}; "
+                "use the matching --volume setting or a new --out path."
+            )
+
+
+def timestamp_ms(value) -> int:
+    """Normalize modern Binance Unix timestamps (seconds, ms, or us) to ms."""
+    value = int(value)
+    if value >= 100_000_000_000_000:
+        return value // 1000
+    if value < 100_000_000_000:
+        return value * 1000
+    return value
 
 
 def last_open_time_from_csv(path: str) -> Optional[int]:
@@ -157,14 +177,14 @@ def last_open_time_from_csv(path: str) -> Optional[int]:
     try:
         row = last_line.decode("utf-8").split(",")
         if row and row[0].isdigit():
-            return int(row[0])
+            return timestamp_ms(row[0])
     except Exception:
         return None
     return None
 
 
-def write_kline_rows(path: str, rows: Iterable[List]) -> int:
-    """Append rows (raw Binance API row lists), adding ISO columns. Returns count."""
+def write_kline_rows(path: str, rows: Iterable[List], volume: bool = False) -> int:
+    """Append raw klines as Unix-second OHLC, optionally including base volume."""
     count = 0
     with open(path, mode="a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -175,12 +195,13 @@ def write_kline_rows(path: str, rows: Iterable[List]) -> int:
             #       quote_asset_volume, number_of_trades, taker_buy_base,
             #       taker_buy_quote, ignore ]
             try:
-                ot = int(r[0])
-                ct = int(r[6])
-                w.writerow([
-                    int(r[0]) // 1000,  # convert ms to seconds
+                row = [
+                    timestamp_ms(r[0]) // 1000,
                     r[1], r[2], r[3], r[4]
-                ])
+                ]
+                if volume:
+                    row.append(r[5])
+                w.writerow(row)
                 count += 1
             except Exception as e:
                 print(f"[WARN] Skipping malformed row: {e} | {r}")
@@ -190,7 +211,8 @@ def write_kline_rows(path: str, rows: Iterable[List]) -> int:
 # --------------------------- API Downloader ------------------------------- #
 
 class ApiDownloader:
-    def __init__(self, market: str, interval: str, rpm: int, retries: int, timeout: int):
+    def __init__(self, market: str, interval: str, rpm: int, retries: int, timeout: int,
+                 volume: bool = False):
         self.market = market
         self.interval = interval
         self.session = requests.Session()
@@ -200,6 +222,7 @@ class ApiDownloader:
         self.delay = 60.0 / float(self.rpm)
         self.retries = max(1, retries)
         self.timeout = timeout
+        self.volume = volume
 
     def _endpoint(self) -> str:
         return f"{self.base}/api/v3/klines" if self.market == "spot" else f"{self.base}/fapi/v1/klines" if self.market == "um" else f"{self.base}/dapi/v1/klines"
@@ -215,7 +238,7 @@ class ApiDownloader:
                 start = last + 1
                 print(f"[API] Resuming from {ms_to_iso(start)}")
         print(f"[API] Downloading {symbol} {self.interval} from {ms_to_iso(start)} to {ms_to_iso(end_ms)}")
-        while True:
+        while start <= end_ms:
             params = {
                 "symbol": symbol.upper(),
                 "interval": self.interval,
@@ -226,9 +249,9 @@ class ApiDownloader:
             data = self._get_with_retries(url, params)
             if not data:
                 break
-            wrote = write_kline_rows(out_path, data)
+            wrote = write_kline_rows(out_path, data, self.volume)
             total += wrote
-            last_open = int(data[-1][0])
+            last_open = timestamp_ms(data[-1][0])
             start = last_open + 1  # avoid overlap regardless of interval size
             if start > end_ms:
                 break
@@ -265,7 +288,8 @@ class ApiDownloader:
 # --------------------------- Archive Downloader --------------------------- #
 
 class ArchiveDownloader:
-    def __init__(self, market: str, interval: str, retries: int, timeout: int):
+    def __init__(self, market: str, interval: str, retries: int, timeout: int,
+                 volume: bool = False):
         self.market = market
         self.interval = interval
         self.session = requests.Session()
@@ -273,6 +297,7 @@ class ArchiveDownloader:
         self.vision_base = VISION_BASE[market]
         self.retries = max(1, retries)
         self.timeout = timeout
+        self.volume = volume
 
     def monthly_url(self, symbol: str, year: int, month: int) -> str:
         mm = f"{month:02d}"
@@ -317,12 +342,12 @@ class ArchiveDownloader:
                         if not r:
                             continue
                         try:
-                            ot = int(r[0])
+                            ot = timestamp_ms(r[0])
                         except Exception:
                             continue
                         if ot < start_ms or ot > end_ms:
                             continue
-                        total += write_kline_rows(out_path, [r])
+                        total += write_kline_rows(out_path, [r], self.volume)
         return total
 
     def fetch(self, symbol: str, start_ms: int, end_ms: int, out_path: str) -> int:
@@ -419,10 +444,10 @@ def run(args: Args) -> None:
     if start_ms >= end_ms:
         raise SystemExit("since must be < until")
 
-    init_csv(args.out)
+    init_csv(args.out, args.volume)
 
-    # If resume without archive step, adjust start time from file
-    if args.resume and args.source in ("api",):
+    # Resume all sources from the last saved bar, including archive mode.
+    if args.resume:
         last = last_open_time_from_csv(args.out)
         if last is not None and last + 1 > start_ms:
             start_ms = last + 1
@@ -431,11 +456,13 @@ def run(args: Args) -> None:
     total_rows = 0
 
     if args.source in ("archive", "auto"):
-        arch = ArchiveDownloader(args.market, args.interval, args.retries, args.timeout)
+        arch = ArchiveDownloader(args.market, args.interval, args.retries, args.timeout,
+                                 volume=args.volume)
         total_rows += arch.fetch(args.symbol, start_ms, end_ms, args.out)
 
     if args.source in ("api", "auto"):
-        api = ApiDownloader(args.market, args.interval, args.rpm, args.retries, args.timeout)
+        api = ApiDownloader(args.market, args.interval, args.rpm, args.retries, args.timeout,
+                            volume=args.volume)
         # For API topping, start where file ends (even if not resume flag) to avoid dups
         last = last_open_time_from_csv(args.out)
         api_start = max(start_ms, (last + 1) if last is not None else start_ms)
@@ -459,7 +486,8 @@ def main():
     p.add_argument("--until", default="now", help="End time: 'YYYY-MM-DD[THH:MM[:SS]]' or 'now'")
     p.add_argument("--out", default="./output.csv", help="Output CSV path")
     p.add_argument("--fmt", default="csv", help="csv | parquet (converts CSV to Parquet if pyarrow available)")
-    p.add_argument("--resume", action="store_true", help="Resume from existing CSV's last open_time when using --source api")
+    p.add_argument("--resume", action="store_true", help="Resume from existing CSV's last open_time")
+    p.add_argument("--volume", action="store_true", help="Include base-asset volume as the sixth CSV column (default: OHLC only)")
     p.add_argument("--rpm", type=int, default=900, help="Requests per minute throttle for API (default 900)")
     p.add_argument("--retries", type=int, default=5, help="HTTP retry attempts per request (default 5)")
     p.add_argument("--timeout", type=int, default=30, help="HTTP timeout seconds (default 30)")
@@ -478,6 +506,7 @@ def main():
         rpm=ns.rpm,
         retries=ns.retries,
         timeout=ns.timeout,
+        volume=ns.volume,
     )
     try:
         run(a)

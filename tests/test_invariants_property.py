@@ -81,7 +81,8 @@ def test_max_hold_bars_zero_preserves_v0_4_0_behavior():
     the pre-#46 kernel, the in-loop check is guarded by `max_hold_bars
     > 0` and must not perturb any trade when off. Run a small fixture
     twice (default vs explicit 0) and assert trade lists equal."""
-    df = bt.load_ohlc("tests/fixtures/sol_1h_30000_31000.csv")
+    from pathlib import Path
+    df = bt.load_ohlc(Path(__file__).parent / "fixtures/sol_1h_30000_31000.csv")
     dfi = bt.compute_indicators(df, 10)
     raw = bt.create_raw_signals(dfi, 10)
     parsed = bt.parse_signals(raw, dfi["time"])

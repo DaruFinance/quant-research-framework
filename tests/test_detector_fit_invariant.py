@@ -1,115 +1,96 @@
-"""Detector-fit no-look-ahead invariant.
+"""Causal detector checks and deliberately leaking global-fit controls.
 
-The framework's ledger-level invariant test (``test_invariants.py``)
-verifies that no trade's entry index precedes the bar at which the
-*strategy parameter* was fit. That guarantee says nothing about the
-*regime detector*, which is a separate function-pointer in the engine
-and which can be (and in the shipped KMeans example
-``examples/regime_custom/`` IS) fit globally on the entire bar series.
-
-This test extends the no-look-ahead invariant to detectors:
-
-  - For a causal detector (default 8-bar EMA-200 consistency rule),
-    the regime label at bar ``i`` must depend only on bars ``0..i``.
-    Concretely: for any ``j > i``, the detector's output at ``i`` must
-    not change if bars beyond ``j`` are perturbed.
-
-  - For a globally-fit detector (KMeans, vol-quantile, trend-vol), the
-    invariant *will fail* by design. The test pickles those detectors
-    as ``known anti-patterns`` and skips them with an explicit reason
-    string; this turns the leak into a documented, named warning rather
-    than a silent failure.
-
-This addresses the v0.5.x roadmap item:
-  "extend the ledger-level invariant to detector-fit indices so the leak
-   is caught automatically".
-
-Run with:  pytest tests/test_detector_fit_invariant.py
+The global-fit functions below are test sentinels, not supported detectors.
 """
-from __future__ import annotations
+from pathlib import Path
+import importlib.util
 
 import numpy as np
 import pandas as pd
 import pytest
 
 import backtester as bt
+from backtester.invariants import InvariantSpec, assert_no_lookahead, list_invariants
+
+_spec = importlib.util.spec_from_file_location(
+    "qrf_regime_example", Path(__file__).parents[1] / "examples/regime_custom/regime_custom.py")
+_example = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_example)
+ML5_LABELS = _example.ML5_LABELS
+TinyKMeansLikeDetector = _example.TinyKMeansLikeDetector
+detect_regimes_ml5 = _example.detect_regimes_ml5
+detect_regimes_vol2 = _example.detect_regimes_vol2
+detect_regimes_vol4 = _example.detect_regimes_vol4
 
 
-def _make_synthetic_bars(seed: int = 0, n: int = 600) -> pd.DataFrame:
-    """Make a deterministic synthetic OHLC series with strict timestamps."""
-    rng = np.random.default_rng(seed)
-    rets = rng.normal(0.0, 0.005, size=n)
-    log_p = np.cumsum(rets) + np.log(100.0)
-    p = np.exp(log_p)
-    high = p * (1 + np.abs(rng.normal(0, 0.001, n)))
-    low  = p * (1 - np.abs(rng.normal(0, 0.001, n)))
-    op   = np.concatenate([[100.0], p[:-1]])
-    times = pd.date_range("2024-01-01", periods=n, freq="1h")
-    df = pd.DataFrame({
-        "time":  times,
-        "open":  op,
-        "high":  high,
-        "low":   low,
-        "close": p,
-    })
-    return df
+@pytest.fixture
+def bars():
+    return pd.read_csv(Path(__file__).parent / "fixtures/sol_1h_30000_31000.csv")
 
 
-def _detector_outputs_at(df: pd.DataFrame) -> pd.Series:
-    """Run the engine's default detector on a frame and return the
-    label series. The detector reads the ``EMA_200`` column, so we add
-    it first; this matches what ``compute_indicators`` would do inside
-    a real engine call."""
-    work = df.copy()
-    work["EMA_200"] = work["close"].ewm(span=200, adjust=False).mean()
-    return bt.detect_regimes(work)
+def _shock_tail(df, cut):
+    polluted = df.copy()
+    for col in ("open", "high", "low", "close"):
+        polluted.loc[polluted.index[cut:], col] *= np.linspace(1, 20, len(df) - cut)
+    return polluted
 
 
-def test_default_detector_is_causal():
-    """The default 8-bar-EMA-200 consistency detector should be causal:
-    the label at bar ``i`` is invariant under perturbations of bars ``i+1+``."""
-    base = _make_synthetic_bars(seed=11, n=600)
-    labels_base = _detector_outputs_at(base)
-
-    # Perturb the last 100 bars by a multiplicative shock.
-    perturbed = base.copy()
-    perturbed.loc[500:, "close"] *= 1.20
-    perturbed.loc[500:, "high"]  *= 1.20
-    perturbed.loc[500:, "low"]   *= 1.20
-    perturbed.loc[500:, "open"]  *= 1.20
-    labels_pert = _detector_outputs_at(perturbed)
-
-    # Bars 0..499 must have unchanged labels.
-    head_base = labels_base.iloc[:500]
-    head_pert = labels_pert.iloc[:500]
-    diff = (head_base.values != head_pert.values).sum()
-    assert diff == 0, (
-        f"Default detector broke causality: {diff} of 500 head labels "
-        f"changed when bars >= 500 were perturbed. The default 8-bar "
-        f"EMA-200 detector should be invariant under such perturbations."
-    )
+def test_default_detector_is_causal(bars):
+    def detector(df):
+        work = df.copy()
+        work["EMA_200"] = work["close"].ewm(span=200, adjust=False).mean()
+        return bt.detect_regimes(work)
+    assert_no_lookahead(InvariantSpec("default", detector), bars, 500,
+                        pollute=_shock_tail)
 
 
-@pytest.mark.parametrize("anti_pattern_kind", [
-    "kmeans",
-    "vol_quantile",
-    "trend_vol",
-])
-def test_globally_fit_detectors_are_known_anti_patterns(anti_pattern_kind):
-    """Globally-fit detectors are documented anti-patterns: refit per
-    WFO IS window or accept that detector-fit information leaks. This
-    test pins the anti-pattern explicitly so a future refactor that
-    silently fixes the leak (or, more dangerously, a future global-fit
-    detector that masquerades as causal) is flagged.
+@pytest.mark.parametrize("anti_pattern_kind", ["kmeans", "vol_quantile", "trend_vol"])
+def test_globally_fit_detectors_are_known_anti_patterns(anti_pattern_kind, bars):
+    def globally_fit(df):
+        if anti_pattern_kind == "kmeans":
+            from scipy.cluster.vq import kmeans2
+            # Deliberately fit all rows: future data changes fitted centers.
+            close = df["close"].to_numpy()
+            centers = np.quantile(close, [0, .5, 1])
+            return kmeans2(close, centers, minit="matrix")[1]
+        ret = df["close"].pct_change(fill_method=None)
+        vol = ret.rolling(20, min_periods=2).std().fillna(0)
+        if anti_pattern_kind == "vol_quantile":
+            return pd.qcut(vol, 3, labels=False)
+        trend = df["close"].diff(20).fillna(0)
+        return (vol > vol.median()).astype(int) * 2 + (trend > trend.median()).astype(int)
 
-    The body skips with a documented reason; the parametrize entries
-    are the canonical anti-patterns named in §9.3 of the v0.4.0 paper.
-    """
-    pytest.skip(
-        f"Globally-fit detector '{anti_pattern_kind}' is a documented "
-        f"anti-pattern (see §9.3 of the paper). The framework permits "
-        f"it but does not endorse it; the correct usage refits per "
-        f"WFO IS window. v0.5.x will land an automated check that "
-        f"refuses to start a backtest when the detector is globally-fit "
-        f"and USE_REGIME_SEG is True."
-    )
+    with pytest.raises(AssertionError, match=f"{anti_pattern_kind}.*leaked future data"):
+        assert_no_lookahead(InvariantSpec(anti_pattern_kind, globally_fit), bars,
+                            500, pollute=_shock_tail)
+
+
+@pytest.mark.parametrize("detector", [detect_regimes_vol2, detect_regimes_vol4, detect_regimes_ml5])
+@pytest.mark.parametrize("cut", [1, 50, 100, 500, 999])
+def test_custom_detectors_are_causal(detector, cut, bars):
+    cut = min(cut, len(bars) - 1)
+    assert_no_lookahead(InvariantSpec(detector.__name__, detector), bars, cut,
+                        pollute=_shock_tail)
+
+
+def test_ml5_excludes_the_current_bar_and_matches_prefixes(bars):
+    detector = TinyKMeansLikeDetector()
+    full = detector(bars)
+    assert set(full).issubset(ML5_LABELS)
+    assert full.nunique() == 5
+    for cut in (1, 49, 50, 99, 100, 501, len(bars) - 1):
+        polluted = _shock_tail(bars, cut)
+        polluted.loc[polluted.index[cut], "close"] *= 100
+        pd.testing.assert_series_equal(full.iloc[:cut + 1], detector(polluted).iloc[:cut + 1])
+        pd.testing.assert_series_equal(full.iloc[:cut], detector(bars.iloc[:cut]))
+
+
+@pytest.mark.parametrize("length", [0, 1, 50, 200])
+def test_ml5_empty_and_flat_warmup(length):
+    frame = pd.DataFrame({"close": np.full(length, 100.0)})
+    assert TinyKMeansLikeDetector()(frame).tolist() == [ML5_LABELS[0]] * length
+
+
+def test_custom_detectors_registered():
+    names = {spec.name for spec in list_invariants()}
+    assert {"example_vol2", "example_vol4", "ml5_quantile"} <= names
