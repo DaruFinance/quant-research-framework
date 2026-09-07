@@ -75,3 +75,14 @@ def test_public_wrapper_uses_config_and_returns_manifest(capsys):
 def test_unknown_mode_is_rejected(mode):
     with pytest.raises(ValueError, match="unknown Monte Carlo mode"):
         run_trade_monte_carlo(RETURNS, mode=mode, runs=1)
+
+
+def test_all_three_modes_parse_with_documented_defaults():
+    assert MonteCarloMode.parse("resampling").default_runs == 1_000
+    assert MonteCarloMode.parse("permutation").default_runs == 1_000
+    assert MonteCarloMode.parse("bar-permutation").default_runs == 500
+
+
+def test_trade_entry_rejects_bar_mode_with_queue_command():
+    with pytest.raises(ValueError, match="mc_bar_permutation/run.py"):
+        run_trade_monte_carlo(RETURNS, mode="bar-permutation")

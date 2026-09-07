@@ -1,0 +1,126 @@
+[package]
+name = "quant-research-framework-rs"
+version = "0.7.6"
+edition = "2021"
+description = "Walk-forward backtester with robustness tests (Rust port of quant-research-framework)"
+license = "Apache-2.0"
+repository = "https://github.com/DaruFinance/quant-research-framework-rs"
+
+[dependencies]
+# Pinned to "=0.9" because rand 0.10 makes `random_range` / `random` trait
+# methods on `RngExt`, breaking call sites in src/lib.rs (Monte Carlo,
+# news-candle injection, indicator-variance overlay) until they are
+# rewritten with explicit `use rand::Rng;` imports. See dependabot PR
+# closing notes; bump once the trait-method migration is folded into a
+# behavioural-change release window.
+rand = "=0.9"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+chrono-tz = { version = "0.10", default-features = false }
+
+# Optional. Pulled in only when the `panel` feature is active.
+# (Phase 2) uses ndarray for the time × asset × field N-D array; csv
+# reads the per-asset OHLC files; serde plumbing through csv.
+ndarray = { version = "0.17", optional = true }
+csv = { version = "1.3", optional = true }
+
+# Normal CDF / inverse-CDF for the Deflated Sharpe Ratio (roadmap item 09).
+# Pulled in only when the `dsr` feature is active. statrs's Normal matches
+# scipy norm.cdf / norm.ppf to ~1e-12: far tighter than the coarse A&S erf.
+statrs = { version = "0.19", optional = true }
+
+[features]
+# Phase 2 panel plugin (#4, #5(iter), #6-#8, #44-#45).
+# Mirrors Python's `pip install -e ".[panel]"` from its source checkout.
+panel = ["dep:ndarray", "dep:csv"]
+# Phase 3 T2 pairs plugin (#10, #11, #12, #13). Mirrors
+# Python's `pip install -e ".[pairs]"` from its source checkout. Depends on
+# the panel substrate for the (time × asset × field) N-D array shape.
+pairs = ["panel"]
+# Phase 3 T6 carry plugin (#39, #39s, #40, #41, #42, #43).
+# Mirrors Python's `pip install -e ".[carry]"` from its source checkout.
+# Loaders read CSV; parquet would add a heavyweight cross-language
+# dep we don't need (the parity scripts always shake out CSV first).
+carry = ["panel"]
+# Deflated Sharpe Ratio post-processing (roadmap item 09). Standalone
+# scalar utility mirroring `backtester/dsr.py`; needs only the normal
+# CDF/inverse-CDF from `statrs`. Its own lightweight feature so DSR is
+# usable without the panel/pairs stack, as Python ships `backtester.dsr`
+# as a thin standalone module.
+dsr = ["dep:statrs"]
+# Shared indicator surface (item 5: indicator parity). Pure-Rust, zero new deps.
+indicators = []
+# Exposes the existing signal-driven core to the reproducible cross-engine
+# execution benchmark. It does not change the default library surface.
+benchmark-internal = []
+# Overfitting-statistics layer (item 3). Pulls in `dsr` so the multitest
+# example's dsr::{psr,...} imports resolve under --features overfit.
+overfit = ["dep:statrs", "dsr"]
+
+[dev-dependencies]
+# Rayon is used only by the parallel batch_runner example; it is NOT a
+# runtime dependency of the engine and does not appear in the published
+# parity claim of three direct deps in §5.1 of the paper.
+rayon = "1.10"
+sha2 = "0.10"
+
+[[bin]]
+name = "backtester"
+path = "src/main.rs"
+
+[[example]]
+name = "batch_runner"
+path = "examples/batch_runner.rs"
+required-features = ["indicators"]
+
+[[example]]
+name = "benchmark_runner"
+path = "examples/benchmark_runner.rs"
+
+[[example]]
+name = "execution_benchmark"
+path = "examples/execution_benchmark.rs"
+required-features = ["benchmark-internal"]
+
+[[example]]
+name = "wfo_benchmark"
+path = "examples/wfo_benchmark.rs"
+required-features = ["indicators"]
+
+[[example]]
+name = "bar_permutation_worker"
+path = "examples/bar_permutation_worker.rs"
+
+[[example]]
+name = "_parity_indicators"
+path = "examples/_parity_indicators.rs"
+required-features = ["indicators"]
+
+[[example]]
+name = "_parity_dsr"
+path = "examples/_parity_dsr.rs"
+required-features = ["dsr"]
+
+# NOTE: _parity_volume and _parity_surface are intentionally NOT declared as
+# [[example]] targets. They are gitignored, generated at runtime by
+# tools/parity_{volume,surface}.py and built with default features (no
+# required-features). Declaring them would make `cargo test` fail on a clean
+# checkout where the files don't exist yet; cargo autodiscovers them from
+# examples/ once the harness writes them, and `cargo build --example
+# _parity_{volume,surface}` works without an explicit entry. The other
+# _parity_* examples below are tracked static runners with required-features,
+# so `cargo test --all-features` works before running any parity harness.
+
+[[example]]
+name = "_parity_pbo"
+path = "examples/_parity_pbo.rs"
+required-features = ["overfit"]
+
+[[example]]
+name = "_parity_multitest"
+path = "examples/_parity_multitest.rs"
+required-features = ["overfit"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

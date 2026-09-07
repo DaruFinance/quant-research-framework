@@ -223,7 +223,6 @@ dependencies = [
 [[package]]
 name = "quant-research-framework-rs"
 version = "0.7.6"
-source = "git+https://github.com/DaruFinance/quant-research-framework-rs?rev=7a40a30abdc3717e96d0309d5df6a203391d14f6#7a40a30abdc3717e96d0309d5df6a203391d14f6"
 dependencies = [
  "chrono",
  "chrono-tz",

@@ -6,8 +6,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use quant_research_framework_rs::{
-    benchmark_backtest, default_ema_signal, parse_signals, Bar as EngineBar, Config, Metrics,
-    Trade,
+    default_ema_signal, run_frozen_backtest, Bar as EngineBar, Config, Metrics, Trade,
 };
 
 const MAGIC: &[u8; 8] = b"QRFMCB01";
@@ -181,6 +180,14 @@ fn argument(args: &[String], name: &str) -> Result<String, String> {
     args.get(index + 1).cloned().ok_or_else(|| format!("missing value after {name}"))
 }
 
+fn parse_bool(value: &str, name: &str) -> Result<bool, String> {
+    match value {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(format!("{name} must be true or false")),
+    }
+}
+
 fn json_float(value: f64) -> String {
     if value == f64::INFINITY { "\"Infinity\"".into() }
     else if value == f64::NEG_INFINITY { "\"-Infinity\"".into() }
@@ -235,14 +242,18 @@ fn run_backtest_mode(args: &[String]) -> Result<(), String> {
     cfg.funding_fee = argument(args, "--funding-fee")?.parse().map_err(|error: std::num::ParseFloatError| error.to_string())?;
     cfg.account_size = argument(args, "--account-size")?.parse().map_err(|error: std::num::ParseFloatError| error.to_string())?;
     cfg.position_size = argument(args, "--position-size")?.parse().map_err(|error: std::num::ParseFloatError| error.to_string())?;
+    cfg.use_sl = parse_bool(&argument(args, "--use-sl")?, "--use-sl")?;
+    cfg.sl_override = Some(argument(args, "--sl-percentage")?.parse().map_err(|error: std::num::ParseFloatError| error.to_string())?);
+    cfg.use_tp = parse_bool(&argument(args, "--use-tp")?, "--use-tp")?;
+    cfg.tp_percentage = argument(args, "--tp-percentage")?.parse().map_err(|error: std::num::ParseFloatError| error.to_string())?;
+    cfg.use_forex = parse_bool(&argument(args, "--forex")?, "--forex")?;
+    cfg.max_hold_bars = argument(args, "--max-hold-bars")?.parse().map_err(|error: std::num::ParseIntError| error.to_string())?;
     cfg.sharpe_bar = argument(args, "--sharpe-mode")? == "bar";
-    let raw = default_ema_signal(&bars, lookback);
-    let signals = parse_signals(&raw);
-    let (trades, metrics, _, _) = benchmark_backtest(&bars, &signals, &cfg);
+    let result = run_frozen_backtest(&bars, &cfg, lookback, default_ema_signal)?;
     let output = Path::new(&output);
     std::fs::create_dir_all(output).map_err(|error| error.to_string())?;
-    write_ledger(&output.join("ledger.bin"), &trades)?;
-    write_metrics(&output.join("metrics.json"), seed, bars.len(), &metrics)
+    write_ledger(&output.join("ledger.bin"), &result.trades)?;
+    write_metrics(&output.join("metrics.json"), seed, bars.len(), &result.metrics)
 }
 
 fn run() -> Result<(), String> {

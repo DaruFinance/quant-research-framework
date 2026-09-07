@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 rand = "=0.9"
-quant-research-framework-rs = { git = "https://github.com/DaruFinance/quant-research-framework-rs", rev = "7a40a30abdc3717e96d0309d5df6a203391d14f6", features = ["benchmark-internal"] }
+quant-research-framework-rs = { path = "vendor/quant-research-framework-rs" }
 
 [profile.release]
 opt-level = 3

@@ -16,6 +16,7 @@ import numpy as np
 
 
 DEFAULT_TRADE_RUNS = 1_000
+DEFAULT_BAR_RUNS = 500
 DEFAULT_SEED = 42
 _WEIGHTS = np.array([0.0117, 0.0317, 0.0861, 0.2341, 0.6364])
 
@@ -25,6 +26,11 @@ class MonteCarloMode(str, Enum):
 
     PERMUTATION = "permutation"
     RESAMPLING = "resampling"
+    BAR_PERMUTATION = "bar-permutation"
+
+    @property
+    def default_runs(self) -> int:
+        return DEFAULT_BAR_RUNS if self is self.BAR_PERMUTATION else DEFAULT_TRADE_RUNS
 
     @classmethod
     def parse(cls, value: str | "MonteCarloMode") -> "MonteCarloMode":
@@ -178,6 +184,11 @@ def run_trade_monte_carlo(
         raise ValueError("seed must be non-negative")
 
     selected_mode = MonteCarloMode.parse(mode)
+    if selected_mode is MonteCarloMode.BAR_PERMUTATION:
+        raise ValueError(
+            "bar-permutation reruns a frozen strategy on OHLCV; use "
+            "mc_bar_permutation/run.py --mode bar-permutation"
+        )
     rng = np.random.default_rng(seed)
     names = ("ROI", "PF", "WinRate", "Exp", "Sharpe", "MaxDrawdown", "Consistency")
     distributions = {name: np.empty(runs, dtype=np.float64) for name in names}
