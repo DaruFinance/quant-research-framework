@@ -263,7 +263,13 @@ Optional scenarios such as:
 - synthetic “news candle” volatility injections
 
 ### Statistical Diagnostics (Optional)
-- Monte Carlo / bootstrap-style validation to compare realized metrics vs randomized outcomes
+- Completed-trade Monte Carlo has two explicit modes: `resampling` draws with
+  replacement, while `permutation` shuffles the observed trades without
+  replacement. `resampling` is the default. Both default to 1,000 simulations,
+  use a configurable seed and report midrank percentiles with tie counts.
+- [`mc_bar_permutation/`](mc_bar_permutation/) provides the separate expensive
+  mode. It reconstructs OHLCV, regenerates a frozen strategy and runs the full
+  backtest 500 times by default. Run counts remain configurable in every mode.
 
 ### Versioning
 

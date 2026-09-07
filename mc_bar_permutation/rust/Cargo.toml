@@ -1,0 +1,14 @@
+[package]
+name = "qrf-bar-permute"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rand = "=0.9"
+quant-research-framework-rs = { path = "vendor/quant-research-framework-rs" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

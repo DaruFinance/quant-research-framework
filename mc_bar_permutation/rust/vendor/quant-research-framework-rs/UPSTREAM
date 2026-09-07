@@ -1,0 +1,6 @@
+Source: https://github.com/DaruFinance/quant-research-framework-rs
+Base commit: 7a40a30abdc3717e96d0309d5df6a203391d14f6
+Snapshot commit: 97d94e059c290be8ccaa2f41bbaf26e3d43e0dd0
+License: Apache-2.0 (see LICENSE)
+Snapshot additions: frozen-backtest entry, Monte Carlo modes and bar permutation module
+Purpose: repository-local Rust bar reconstruction and frozen full-backtest engine
