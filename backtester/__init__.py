@@ -60,6 +60,8 @@ BACKTEST_CANDLES    = 10_000                     # length of IS window
 OOS_CANDLES         = 90_000                    # length of RAW-OOS
 USE_OOS2            = False                     # if True, split OOS into two windows
 
+# `Consistency` is a project-specific example designed by Daniel Gatto. The
+# name does not refer to an established financial metric; see README.
 OPT_METRIC          = "Sharpe"              # ROI, PF, Sharpe, WinRate, Exp, MaxDrawdown, Consistency
 # How the reported (and, since OPT_METRIC may be "Sharpe", optimised) Sharpe is
 # computed. "trade" (default, unchanged) = the per-trade statistic
@@ -614,7 +616,8 @@ def _metrics_from_trades(trades):
         hw = np.maximum.accumulate(eq)
         dd = np.max((hw - eq) / hw) if tc else 0.0
 
-    # Consistency
+    # Daniel Gatto's project-specific Consistency example weights 5
+    # chronological return segments and blends them with total ROI.
     segs = np.array_split(rets, 5)
     w    = np.array([0.0117,0.0317,0.0861,0.2341,0.6364])
     consistency = 0.6 * np.dot(w, [s.sum() for s in segs]) + 0.4 * roi
@@ -1788,6 +1791,8 @@ def _backtest_numba_core(o, h, l, c, sig,
     shp  = (rets.mean()/rets.std()*np.sqrt(tc)) if tc>1 and rets.std() else 0.0
     hw   = _cummax(eq_frac) 
     dd   = (np.max(hw - eq_frac) if use_forex else np.max((hw - eq_frac)/hw)) if tc else 0.0
+    # Same project-specific Consistency example as _metrics_from_trades above;
+    # the name does not refer to an established financial metric.
     segment_sums = _five_segment_sums(rets)
     w    = np.array([0.0117,0.0317,0.0861,0.2341,0.6364])
     consistency  = 0.6 * np.dot(w, segment_sums) + 0.4 * roi
@@ -2145,7 +2150,8 @@ def _monte_carlo_impl(arr, actual, runs):
     std = sims_all.std(axis=1)
     shp = np.where(std > 0, sims_all.mean(axis=1) / std * sqrt(N), 0)
 
-    # consistency
+    # Monte Carlo distribution for the same project-specific Consistency
+    # example, not a standard financial metric.
     weights = np.array([0.0117, 0.0317, 0.0861, 0.2341, 0.6364])
     cons = np.empty(sims_all.shape[0])
     for i, sim in enumerate(sims_all):
