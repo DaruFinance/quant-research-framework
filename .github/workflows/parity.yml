@@ -26,8 +26,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python: ['3.10', '3.11', '3.12']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - name: Install deps
@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout this repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: quant-research-framework
 
@@ -66,14 +66,14 @@ jobs:
           fi
 
       - name: Checkout the Rust port (matching branch, otherwise main)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: DaruFinance/quant-research-framework-rs
           ref: ${{ steps.counterpart.outputs.ref }}
           path: quant-research-framework-rs
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.10'
 
