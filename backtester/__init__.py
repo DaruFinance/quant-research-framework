@@ -24,6 +24,7 @@ from matplotlib.gridspec import GridSpec
 import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
+from .monte_carlo import MonteCarloMode, MonteCarloResult, run_trade_monte_carlo
 from . import orchestrator  # WFO dispatch registry
 from .ledger_lock import (acquire as _acquire_trade_csv_lock,
                           release as _release_trade_csv_lock,
@@ -78,6 +79,8 @@ DRAWDOWN_CONSTRAINT = None    # Skip optimizations with a drawdown higher than t
 PRINT_EQUITY_CURVE  = True                       # plot
 USE_MONTE_CARLO     = True                       # on first IS only
 MC_RUNS             = 1000                       # simulations
+MC_MODE             = "resampling"               # "resampling" | "permutation"
+MC_SEED             = 42
 
 USE_SL         = True    # whether to enable stop loss
 SL_PERCENTAGE  = 1.0     # stop loss percent (e.g. 1.0 for 1%)
@@ -267,6 +270,7 @@ class Config:
     trade_sessions: bool = False
     session_start: str = "8:00"
     session_end: str = "16:50"
+    max_hold_bars: int = 0
 
     # Lookback / windowing
     default_lb: int = 50
@@ -277,6 +281,7 @@ class Config:
 
     # Optimiser
     opt_metric: str = "Sharpe"
+    sharpe_mode: str = "trade"
     min_trades: int = 10
     smart_optimization: bool = True
     drawdown_constraint: Optional[float] = None
@@ -286,6 +291,8 @@ class Config:
     print_equity_curve: bool = True
     use_monte_carlo: bool = True
     mc_runs: int = 1000
+    mc_mode: str = "resampling"
+    mc_seed: int = 42
 
     # SL / TP / RRR
     use_sl: bool = True
@@ -354,12 +361,14 @@ class Config:
         'trade_sessions': 'TRADE_SESSIONS',
         'session_start': 'SESSION_START',
         'session_end': 'SESSION_END',
+        'max_hold_bars': 'MAX_HOLD_BARS',
         'default_lb': 'DEFAULT_LB',
         'lookback_range': 'LOOKBACK_RANGE',
         'backtest_candles': 'BACKTEST_CANDLES',
         'oos_candles': 'OOS_CANDLES',
         'use_oos2': 'USE_OOS2',
         'opt_metric': 'OPT_METRIC',
+        'sharpe_mode': 'SHARPE_MODE',
         'min_trades': 'MIN_TRADES',
         'smart_optimization': 'SMART_OPTIMIZATION',
         'drawdown_constraint': 'DRAWDOWN_CONSTRAINT',
@@ -367,6 +376,8 @@ class Config:
         'print_equity_curve': 'PRINT_EQUITY_CURVE',
         'use_monte_carlo': 'USE_MONTE_CARLO',
         'mc_runs': 'MC_RUNS',
+        'mc_mode': 'MC_MODE',
+        'mc_seed': 'MC_SEED',
         'use_sl': 'USE_SL',
         'sl_percentage': 'SL_PERCENTAGE',
         'use_tp': 'USE_TP',
@@ -2095,163 +2106,102 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
     return selected[1], selected[2]
 
 # 7. MONTE CARLO
-def monte_carlo(arr, actual, runs, config: Optional[Config] = None):
-    """Monte Carlo bootstrap & shuffle of the realised return series.
+def monte_carlo(arr, actual=None, runs=None, config: Optional[Config] = None,
+                *, mode=None, seed=None):
+    """Run one completed-trade Monte Carlo mode and return its result.
 
-    `config` is optional; see `optimiser` docstring for the contract.
-    The MC routine itself is config-free (no engine knobs participate),
-    but the parameter is accepted for API symmetry with the rest of
-    the public surface.
+    ``resampling`` is the default because it estimates distributions for both
+    path-dependent and order-invariant metrics. ``permutation`` only changes
+    the order of the observed trades. The ``actual`` argument remains for
+    source compatibility; observed metrics are recomputed from ``arr`` so the
+    actual and simulated statistics always share one convention.
     """
+    del actual
     with with_config(config):
-        return _monte_carlo_impl(arr, actual, runs)
+        selected_runs = MC_RUNS if runs is None else runs
+        selected_mode = MC_MODE if mode is None else mode
+        selected_seed = MC_SEED if seed is None else seed
+        try:
+            result = run_trade_monte_carlo(
+                arr,
+                mode=selected_mode,
+                runs=selected_runs,
+                seed=selected_seed,
+                forex_mode=FOREX_MODE,
+            )
+        except ValueError as exc:
+            if np.asarray(arr).size == 0:
+                print(" Monte Carlo skipped: no return series provided.")
+                return None
+            raise exc
 
+        print(f"\n Monte Carlo ({result.mode.value}, seed={result.seed}, "
+              f"runs={result.completed_runs})")
+        print(f" Sharpe: {result.sharpe_convention}")
+        print(f" Drawdown: {result.drawdown_convention}")
+        for metric in METRICS + ['Consistency']:
+            rank = result.ranks[metric]
+            print(f"  {metric:>12}: {rank.percentile:7.3f}th percentile "
+                  f"(ties={rank.ties})")
 
-def _monte_carlo_impl(arr, actual, runs):
-    N = arr.size
-    if N == 0:
-        print(" Monte Carlo skipped: no return series provided.")
-        return
+        percs = [5, 25, 50, 75, 95]
+        eq_pct = np.percentile(result.equity_paths, percs, axis=0)
+        print("\n Equity Curve Final Value Percentiles ")
+        for percentile, value in zip(percs, eq_pct[:, -1]):
+            print(f"  {percentile:>2}th pct: {value:9.4f}")
+        roi = result.distributions['ROI']
+        dd = result.distributions['MaxDrawdown']
+        print(f"\nSimulations ending with LOSS:           {np.mean(roi < 0) * 100:5.1f}%")
+        print(f"Simulations max-DD > 80 %:              {np.mean(dd > 0.80) * 100:5.1f}%\n")
 
-    # bootstrap and shuffle
-    sims_boot  = np.random.choice(arr, size=(runs, N), replace=True)
-    sims_shuff = np.array([np.random.permutation(arr) for _ in range(runs)])
-    sims_all   = np.concatenate((sims_boot, sims_shuff), axis=0)
+        if PRINT_EQUITY_CURVE:
+            n = np.asarray(arr).size
+            x = np.arange(1, n + 1)
+            scale = 1.0 if FOREX_MODE else ACCOUNT_SIZE
+            actual_equity = np.cumsum(arr) if FOREX_MODE else 1.0 + np.cumsum(arr)
+            unit = "R" if FOREX_MODE else "USD"
+            fig = plt.figure(figsize=(10, 5))
+            ax = fig.add_subplot(1, 1, 1)
+            ax.plot(x, scale * actual_equity, color='black',
+                    label=f'Actual equity ({unit})', linewidth=1.6)
+            ax.fill_between(x, scale * eq_pct[0], scale * eq_pct[-1],
+                            alpha=0.18, label='5-95% band')
+            ax.fill_between(x, scale * eq_pct[1], scale * eq_pct[-2],
+                            alpha=0.28, label='25-75% band')
+            ax.plot(x, scale * eq_pct[2], color='royalblue',
+                    label='Median (50%)', linewidth=1.2)
+            ax.set_title(f'Monte Carlo Equity Curve Bands ({unit})')
+            ax.legend(); ax.grid(True)
+            fig.tight_layout()
 
-    # --- metric calculations ---
-    roi    = sims_all.sum(axis=1)
-    wins   = np.where(sims_all > 0, sims_all, 0)
-    losses = np.where(sims_all <= 0, -sims_all, 0)
-
-    wins_sum   = wins.sum(axis=1)
-    losses_sum = losses.sum(axis=1)
-
-    # Profit factor: avoid inf by using NaNlarge finite
-    pf = np.divide(
-        wins_sum, 
-        losses_sum,
-        out=np.full_like(wins_sum, np.nan),
-        where=losses_sum > 0
-    )
-    pf = np.where(np.isnan(pf), 1e9, pf)
-
-    wr  = np.mean(sims_all > 0, axis=1)
-    mw  = np.where(
-        wins_sum > 0,
-        wins_sum / np.maximum(np.count_nonzero(wins, axis=1), 1),
-        0
-    )
-    ml  = np.where(
-        losses_sum > 0,
-        losses_sum / np.maximum(np.count_nonzero(losses, axis=1), 1),
-        0
-    )
-    exp = mw * wr - ml * (1 - wr)
-    std = sims_all.std(axis=1)
-    shp = np.where(std > 0, sims_all.mean(axis=1) / std * sqrt(N), 0)
-
-    # Monte Carlo distribution for the same project-specific Consistency
-    # example, not a standard financial metric.
-    weights = np.array([0.0117, 0.0317, 0.0861, 0.2341, 0.6364])
-    cons = np.empty(sims_all.shape[0])
-    for i, sim in enumerate(sims_all):
-        segs = np.array_split(sim, 5)
-        rois = [s.sum() for s in segs]
-        cons[i] = 0.6 * np.dot(weights, rois) + 0.4 * sim.sum()
-
-    # equity curves & drawdown
-    eqs = 1.0 + np.cumsum(sims_all, axis=1)
-    hw  = np.maximum.accumulate(eqs, axis=1)
-    dd  = ((hw - eqs) / hw).max(axis=1)
-
-    dist = {
-        'ROI':         roi,
-        'PF':          pf,
-        'WinRate':     wr,
-        'Exp':         exp,
-        'Sharpe':      shp,
-        'MaxDrawdown': dd,
-        'Consistency': cons
-    }
-
-    # prints
-    print("\n Monte-Carlo Percentile Ranks vs ACTUAL ")
-    for m in METRICS + ['Consistency']:
-        pct = np.mean(dist[m] <= actual[m]) * 100
-        print(f"  {m:>12}: {pct:6.1f}th percentile")
-
-    percs  = [5, 25, 50, 75, 95]
-    eq_pct = np.percentile(eqs, percs, axis=0)
-
-    print("\n Equity Curve Final Value Percentiles ")
-    for p, val in zip(percs, eq_pct[:, -1]):
-        print(f"  {p:>2}th pct: {val:9.4f}")
-    loss_pct = np.mean(roi < 0) * 100
-    dd80_pct = np.mean(dd > 0.80) * 100
-    print(f"\nSimulations ending with LOSS:           {loss_pct:5.1f}%")
-    print(f"Simulations max-DD > 80 %:              {dd80_pct:5.1f}%\n")
-
-    if PRINT_EQUITY_CURVE:
-        x   = np.arange(1, N + 1)
-        fig = plt.figure(figsize=(10, 5))
-        ax  = fig.add_subplot(1, 1, 1)
-
-        # actual equity
-        ax.plot(ACCOUNT_SIZE * (1.0 + np.cumsum(arr)),
-                color='black', label='Actual equity ($)', linewidth=1.6)
-
-        # simulated bands
-        ax.fill_between(x,
-                        ACCOUNT_SIZE * eq_pct[0],
-                        ACCOUNT_SIZE * eq_pct[-1],
-                        alpha=0.18, label='5-95% band')
-        ax.fill_between(x,
-                        ACCOUNT_SIZE * eq_pct[1],
-                        ACCOUNT_SIZE * eq_pct[-2],
-                        alpha=0.28, label='25-75% band')
-        ax.plot(x,
-                ACCOUNT_SIZE * eq_pct[2],
-                color='royalblue',
-                label='Median (50%)',
-                linewidth=1.2)
-
-        ax.set_title('Monte-Carlo Equity Curve Bands (USD)')
-        ax.legend(); ax.grid(True)
-        fig.tight_layout()
-
-        # histograms
-        hist_keys = [
-          ('ROI',         'ROI'),
-          ('MaxDrawdown','Max DD'),
-          ('PF',          'Profit Factor'),
-          ('Sharpe',      'Sharpe'),
-          ('Consistency','Consistency')
-        ]
-        fig2 = plt.figure(figsize=(14, 8))
-        gs   = GridSpec(2, 3, fig2)
-        for idx, (k, title) in enumerate(hist_keys):
-            r, c = divmod(idx, 3)
-            axh  = fig2.add_subplot(gs[r, c])
-
-            data = dist[k]
-            # drop any non-finite just in case
-            data = data[np.isfinite(data)]
-            if data.size == 0:
-                axh.text(0.5, 0.5, 'No data', ha='center', va='center')
-            else:
-                # clip PF for readability
-                if k == 'PF':
-                    data = np.clip(data, 0, 50)
-                axh.hist(data, bins=100)
-                axh.axvline(min(actual[k], 50 if k=='PF' else actual[k]),
-                            color='red', linestyle='--', linewidth=1.5)
-
-            axh.set_title(title)
-            axh.grid(True)
-
-        fig2.add_subplot(gs[1, 2]).axis('off')
-        fig2.suptitle('Simulation Metric Distributions')
-        fig2.tight_layout(rect=[0, 0, 1, 0.96])
+            hist_keys = [
+                ('ROI', 'ROI'), ('MaxDrawdown', 'Max DD'),
+                ('PF', 'Profit Factor'), ('Sharpe', 'Sharpe'),
+                ('Consistency', 'Consistency'),
+            ]
+            fig2 = plt.figure(figsize=(14, 8))
+            gs = GridSpec(2, 3, fig2)
+            for index, (key, title) in enumerate(hist_keys):
+                row, column = divmod(index, 3)
+                axis = fig2.add_subplot(gs[row, column])
+                data = result.distributions[key]
+                data = data[np.isfinite(data)]
+                if data.size == 0:
+                    axis.text(0.5, 0.5, 'No finite data', ha='center', va='center')
+                else:
+                    if key == 'PF':
+                        data = np.clip(data, 0, 50)
+                    axis.hist(data, bins=100)
+                    actual_value = result.ranks[key].actual
+                    if np.isfinite(actual_value):
+                        axis.axvline(min(actual_value, 50) if key == 'PF' else actual_value,
+                                    color='red', linestyle='--', linewidth=1.5)
+                axis.set_title(title)
+                axis.grid(True)
+            fig2.add_subplot(gs[1, 2]).axis('off')
+            fig2.suptitle('Simulation Metric Distributions')
+            fig2.tight_layout(rect=[0, 0, 1, 0.96])
+        return result
 # 8. PRINTER
 def prettyprint(tag, m, lb=None):
     lb_note  = f"(LB {lb}) " if lb else ""
