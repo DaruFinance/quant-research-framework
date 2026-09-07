@@ -86,12 +86,18 @@ def strategy_signals(df: pd.DataFrame, strategy: dict) -> tuple[pd.DataFrame, np
         raise ValueError(
             f"unsupported strategy kind {kind!r}; choose ema-crossover or python-callable"
         )
-    raw = np.asarray(raw, dtype=np.int8)
+    raw = np.asarray(raw)
     if raw.shape != (len(prepared),):
         raise ValueError(f"strategy returned shape {raw.shape}; expected {(len(prepared),)}")
+    try:
+        finite = np.isfinite(raw).all()
+    except TypeError as exc:
+        raise ValueError("raw strategy signals must be finite numeric values") from exc
+    if not finite:
+        raise ValueError("raw strategy signals must be finite")
     if not np.isin(raw, (-1, 0, 1)).all():
         raise ValueError("raw strategy signals must be -1, 0 or 1")
-    return prepared, raw
+    return prepared, raw.astype(np.int8, copy=False)
 
 
 def config_from_spec(values: dict) -> bt.Config:

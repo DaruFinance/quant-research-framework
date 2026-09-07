@@ -20,6 +20,10 @@ ALLOWED_CONFIG = {
     "funding_fee", "use_sl", "sl_percentage", "use_tp", "tp_percentage",
     "forex_mode", "max_hold_bars", "sharpe_mode",
 }
+CALLBACK_CONFIG = ALLOWED_CONFIG | {
+    "risk_amount", "trade_sessions", "session_start", "session_end",
+    "pip_size", "clamp_results",
+}
 
 
 def load_spec(path: Path) -> tuple[dict, dict]:
@@ -28,21 +32,30 @@ def load_spec(path: Path) -> tuple[dict, dict]:
     if unknown_top:
         raise ValueError(f"unsupported top-level fields: {', '.join(unknown_top)}")
     strategy = dict(spec.get("strategy", {}))
-    if strategy.get("kind") != "ema-crossover":
+    kind = strategy.get("kind")
+    if kind not in {"ema-crossover", "python-callable"}:
         raise ValueError(
-            f"unsupported strategy kind {strategy.get('kind')!r}; "
-            "use python-callable for a custom strategy"
+            f"unsupported strategy kind {kind!r}; choose ema-crossover or python-callable"
         )
-    unknown_strategy = sorted(set(strategy) - {"kind", "lookback", "parameters"})
+    allowed_strategy = {"kind", "lookback", "parameters"}
+    if kind == "python-callable":
+        allowed_strategy.add("callable")
+    unknown_strategy = sorted(set(strategy) - allowed_strategy)
     if unknown_strategy:
         raise ValueError(f"unsupported strategy fields: {', '.join(unknown_strategy)}")
-    if strategy.get("parameters", {}):
+    parameters = strategy.get("parameters", {})
+    if not isinstance(parameters, dict):
+        raise ValueError("strategy.parameters must be an object")
+    if kind == "ema-crossover" and parameters:
         raise ValueError("ema-crossover does not accept strategy.parameters")
+    if kind == "python-callable" and not strategy.get("callable"):
+        raise ValueError("python-callable requires package.module:function in strategy.callable")
     lookback = int(strategy.get("lookback", 0))
     if lookback <= 0:
         raise ValueError("strategy.lookback must be positive")
     config = dict(spec.get("config", {}))
-    unknown_config = sorted(set(config) - ALLOWED_CONFIG)
+    allowed_config = CALLBACK_CONFIG if kind == "python-callable" else ALLOWED_CONFIG
+    unknown_config = sorted(set(config) - allowed_config)
     if unknown_config:
         raise ValueError(f"unsupported config fields: {', '.join(unknown_config)}")
     missing = sorted((ALLOWED_CONFIG - {"max_hold_bars", "sharpe_mode"}) - set(config))
@@ -63,7 +76,9 @@ def build_generator(root: Path, target: Path) -> Path:
     return target / "release" / name
 
 
-def complete_status(run_dir: Path, source_hash: str, spec_hash: str, seed: int) -> bool:
+def complete_status(
+    run_dir: Path, source_hash: str, spec_hash: str, seed: int, worker_hash: str,
+) -> bool:
     path = run_dir / "status.json"
     if not path.exists():
         return False
@@ -71,16 +86,28 @@ def complete_status(run_dir: Path, source_hash: str, spec_hash: str, seed: int) 
         status = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
+    metrics = run_dir / "metrics.json"
+    ledger_name = status.get("ledger_file")
+    if not isinstance(ledger_name, str) or Path(ledger_name).name != ledger_name:
+        return False
+    ledger = run_dir / ledger_name
+    if not metrics.is_file() or not ledger.is_file():
+        return False
     return (
         status.get("status") == "complete"
         and status.get("source_sha256") == source_hash
         and status.get("spec_sha256") == spec_hash
         and status.get("seed") == seed
+        and status.get("worker_sha256") == worker_hash
+        and status.get("metrics_sha256") == sha256(metrics)
+        and status.get("ledger_sha256") == sha256(ledger)
     )
 
 
 def run_one(command: list[str], environment: dict[str, str], run_dir: Path,
-            seed: int, source_hash: str, spec_hash: str) -> dict:
+            seed: int, source_hash: str, spec_hash: str, worker_hash: str) -> dict:
+    for name in ("metrics.json", "ledger.bin", "ledger.npz", "status.json"):
+        (run_dir / name).unlink(missing_ok=True)
     started = time.perf_counter()
     process = subprocess.run(
         command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -94,15 +121,14 @@ def run_one(command: list[str], environment: dict[str, str], run_dir: Path,
             "elapsed_seconds": time.perf_counter() - started,
             "stderr": process.stderr[-4000:],
         }
-    elif (run_dir / "status.json").exists():
-        return json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
     else:
         metrics = run_dir / "metrics.json"
-        ledger = run_dir / "ledger.bin"
+        ledger = run_dir / ("ledger.bin" if (run_dir / "ledger.bin").is_file() else "ledger.npz")
         status = {
             "status": "complete", "seed": seed,
             "source_sha256": source_hash, "spec_sha256": spec_hash,
             "metrics_sha256": sha256(metrics), "ledger_sha256": sha256(ledger),
+            "ledger_file": ledger.name, "worker_sha256": worker_hash,
             "elapsed_seconds": time.perf_counter() - started,
         }
     atomic_json(run_dir / "status.json", status)
@@ -180,7 +206,13 @@ def main() -> None:
         seed = args.seed + index
         run_dir = output / "runs" / f"{index:06d}"
         run_dir.mkdir(parents=True, exist_ok=True)
-        if complete_status(run_dir, source_hash, spec_hash, seed):
+        worker_hash = sha256(barperm)
+        if strategy.get("kind") == "python-callable":
+            worker_hash = ":".join((
+                worker_hash, sha256(worker),
+                sha256(root.parent / "backtester" / "__init__.py"),
+            ))
+        if complete_status(run_dir, source_hash, spec_hash, seed, worker_hash):
             statuses[index] = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
             continue
         if strategy.get("kind") == "ema-crossover":
@@ -207,7 +239,7 @@ def main() -> None:
                 "--input", str(source), "--spec", str(spec),
                 "--run-dir", str(run_dir), "--seed", str(seed),
             ]
-        pending.append((index, seed, run_dir, command))
+        pending.append((index, seed, run_dir, command, worker_hash))
 
     print(
         f"bar-permutation is expensive: {args.runs} complete strategy backtests "
@@ -218,9 +250,9 @@ def main() -> None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_map = {
             executor.submit(
-                run_one, command, environment, run_dir, seed, source_hash, spec_hash
+                run_one, command, environment, run_dir, seed, source_hash, spec_hash, worker_hash
             ): (index, seed, run_dir)
-            for index, seed, run_dir, command in pending
+            for index, seed, run_dir, command, worker_hash in pending
         }
         for future in concurrent.futures.as_completed(future_map):
             index, seed, run_dir = future_map[future]

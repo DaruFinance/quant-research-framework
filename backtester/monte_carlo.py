@@ -117,7 +117,7 @@ def _metric_values(sim: np.ndarray, forex_mode: bool) -> tuple[dict[str, float],
         drawdown_convention = "absolute R from equity 0"
     else:
         equity = 1.0 + np.cumsum(sim)
-        high_water = np.maximum.accumulate(equity)
+        high_water = np.maximum.accumulate(np.concatenate(([1.0], equity)))[1:]
         with np.errstate(divide="ignore", invalid="ignore"):
             drawdowns = np.divide(
                 high_water - equity,
