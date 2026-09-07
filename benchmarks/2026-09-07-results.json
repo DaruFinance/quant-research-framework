@@ -1,0 +1,104 @@
+{
+  "date_utc": "2026-09-07",
+  "scope": "single-run observations on WSL2, serial execution, all BLAS thread counts set to 1; fresh processes, without resetting OS or library caches",
+  "dataset": {
+    "instrument": "BTCUSDT spot",
+    "interval": "30m",
+    "bars": 150000,
+    "first_utc": "2017-11-01T00:00:00Z",
+    "last_utc": "2026-05-28T10:30:00Z",
+    "sha256": "6ba414b666f71b20e38915dc9a99144d9f71c24bb1007d53be281b9cd861ce87"
+  },
+  "wfo": {
+    "boundary": "one fresh process per engine; 10 fixed configurations (5 signal families x 2 lookbacks); 10000 IS + 140000 OOS; 28 windows; WFO only; first Python JIT included; Rust compilation excluded; persisted ledgers included",
+    "python": {"wall_s": 112.37, "user_s": 109.19, "sys_s": 0.41, "max_rss_kb": 294268},
+    "rust": {"wall_s": 7.20, "user_s": 5.37, "sys_s": 0.17, "max_rss_kb": 11008},
+    "python_over_rust_wall_ratio": 15.606944444444444,
+    "python_over_rust_rss_ratio": 26.731468023255815,
+    "validation": {
+      "strategies": 10,
+      "windows_each": 28,
+      "ledger_rows_each_engine": 40511,
+      "max_metric_abs_delta": 6.661338147750939e-14,
+      "rust_ledgers_byte_identical_before_after_buffering": true
+    }
+  },
+  "matched_execution": {
+    "boundary": "one fresh process per engine; one OHLC and one frozen-event CSV load; 10 serial long-only full-history passes; event generation excluded; no WFO, optimization, SL/TP, funding, strategy calculation or warm-up; normalized ledger output included",
+    "combined_execution_charge_per_fill": 0.0007,
+    "events_sha256": "cf937455503e1b0cb3cb69784dbc3833d7c7b718a6c0b6d024f58ad0807d0efe",
+    "timing_resolution_s": 0.01,
+    "results": [
+      {"engine": "QRF Rust", "version": "0.7.6", "wall_s": 0.46, "user_s": 0.05, "sys_s": 0.05, "max_rss_kb": 17920, "engine_elapsed_s": 0.010376934},
+      {"engine": "QRF Python", "version": "0.7.6", "wall_s": 2.66, "user_s": 1.84, "sys_s": 0.27, "max_rss_kb": 286820, "engine_elapsed_s": 0.413756758},
+      {"engine": "Backtesting.py", "version": "0.6.5", "wall_s": 7.43, "user_s": 6.96, "sys_s": 0.20, "max_rss_kb": 184544, "engine_elapsed_s": 5.915131751},
+      {"engine": "vectorbt", "version": "1.0.0", "wall_s": 8.43, "user_s": 5.89, "sys_s": 0.60, "max_rss_kb": 491264, "engine_elapsed_s": 3.064760636}
+    ],
+    "validation": {
+      "strategies": 10,
+      "trades_each_engine": 20137,
+      "exact_columns": ["strategy", "trade_id", "side", "entry_idx", "exit_idx"],
+      "exact_float_columns": ["entry_price", "exit_price", "quantity"],
+      "max_float_abs_delta": 7.275957614183426e-12,
+      "rtol": 1e-10,
+      "atol": 1e-8
+    }
+  },
+  "environment": {
+    "platform": "Linux 6.6.87.2-microsoft-standard-WSL2 x86_64; glibc 2.35",
+    "python": "3.10.12",
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "numba": "0.65.1",
+    "rustc": "1.97.1"
+  },
+  "measured_source_sha256": {
+    "wfo_python_batch10.py": "5cb02985d125fd9ecf1aa9dbceed68c9a298453486181d8d3f4b5fa4eddfd332",
+    "wfo_rust_main.rs": "1bf7bc6c5a250d4ea1d0e740539d00914acd6c26ea53da822c5b23e29e914c27",
+    "execution_benchmark.rs": "0187e7daf174ad51f48f4f7d3797bce5971b2f9c6c78f052f489c6f28c9dfb12",
+    "rust_src_lib.rs": "a22c1b209e1961afaf135c078e067f06e283a4ae27c8dcec7a19a1a0e5ec6a79",
+    "shared.py": "ff438db6c900b0c38044ae73bbab5cea76b47cfe1b8c88461a180148827741c2",
+    "write_events.py": "1be7a74095e87bbaeb9b253f53d781e297285ec89d556dceecb7e704e78cca62",
+    "run_qrf_python.py": "cdc768eba7a45ceca090c59a8a43e44d69e13641d39e5ace0910ac42d5e1e453",
+    "run_vectorbt.py": "0f54ce66609ce08992bea59eacf2feb4c8bbf53cf276aa4dae48501821ffff2e",
+    "run_backtesting.py": "3ac521771bb9d4951a06e16e16efa612c719a27fa15f0ca5f72b48fdaa19c28a",
+    "verify_ledgers.py": "b23eab2847736c5912a713f040164eed0aaf2e508c6075660124ece9fb760ae7",
+    "CONTRACT.md": "cbd6bee37c41e6b6c7ab41fb71ddfbadf57d50f4396a6070993dc68948ac1d61"
+  },
+  "wfo_raw_artifact_sha256": {
+    "python_time": "7aaf2a85ff6333b0bec9f977241ac1eb0290f756531c00b528e477467b45fc6a",
+    "rust_time": "4b88f3e3398215ff2df7acc65673a7f29d87749c71d03ae23242323c38a348c6",
+    "python_results": "a786ea05e9d8a2989216a8face4098e58c245d7110b94bcac2716cd1452d2875",
+    "rust_results": "3ff11aef5f06261ff5031bf05096d451a07469b579dd055b41b5b29ca8abf8fb",
+    "verification": "58c50aa16d3f67aabebde04fcb6c02f2f32dba0ca1f88ecb00a35190f186956f"
+  },
+  "matched_execution_raw_artifact_sha256": {
+    "event_metadata": "6d7194795d142cae27f97516a38a99ce6fa05c877fab91cc172b3766f99d1473",
+    "qrf_rust_time": "4514dae6e4b30ededf57d72ba4ba693e44e210db6f7521294c9e3f02c370c9ad",
+    "qrf_python_time": "5cddd27b33318a8247da7bb487e9b6b95c47fdb8b706ee9ac874143b0a685476",
+    "vectorbt_time": "699c575b68bbfbd729e0a94428a00a724f6273a149026cf333db905078d5afd4",
+    "backtesting_time": "74588f607fbea83785ded3add0ba24926dcb9ab98ccf2631d9eabe19a02b56ca",
+    "qrf_rust_results": "e3f93d851f4af6efc0ec0ec0dcf88f1766f19f1e04adda9acb0d36d5d64cc4cc",
+    "qrf_python_results": "c826213fb07df3cfafb001dfe8cda832cba8f54daf14c52304e9b3e1832f3013",
+    "vectorbt_results": "35bf0c40583c27d634bc8ec504e03fad9102efad32d673fc78ae5280ec3917f3",
+    "backtesting_results": "ed8d19b342825610031a868552a5a346ae101af930fabe2b6955e5b5501a8bbb",
+    "verify_qrf_python": "baa06be5f86e7fdc611ea3ec386eea13280273bbf9fcba764f51d5f131425de1",
+    "verify_vectorbt": "73d436b91035a87e8fe0d4632a90582735d1d8f2d165fceff3d0607ebba22f30",
+    "verify_backtesting": "2595d8a028887b9887bc56c6bd0eae2ff40bff6dafd7c261493c752fd7180092"
+  },
+  "published_source_note": "The measured Python adapters are preserved semantically. Published files use LF endings, and shared.py replaces machine-local defaults with repository-relative defaults. The published Rust library removes formatter-only changes from the measured working tree while retaining the benchmark entry exactly. All timed code paths are unchanged.",
+  "published_source_sha256": {
+    "bench_paper.py": "08bc7a7fda7091cc57cd00409ed9251bedcde085f8095b6973b75269098f6368",
+    "bench_python_wfo.py": "a3431145d018221b184e41dfc5ef6fe5d5513fd9aef8a5327379c5704622b7f9",
+    "wfo_benchmark.rs": "066a5b3692c1a3f1db6136079501e6f4da0a4bd6defda25728fd7af2e4f3efca",
+    "execution_benchmark.rs": "0187e7daf174ad51f48f4f7d3797bce5971b2f9c6c78f052f489c6f28c9dfb12",
+    "rust_src_lib.rs": "108c82b35f02d3f7c8343e56c44267bc832bdf7077aa3724d1e5de284ef70d30",
+    "shared.py": "d3b0d7b70f62f440cb195e37f1b61004badba612aaa5ae3dc390f276326cac7d",
+    "write_events.py": "1be7a74095e87bbaeb9b253f53d781e297285ec89d556dceecb7e704e78cca62",
+    "run_qrf_python.py": "cdc768eba7a45ceca090c59a8a43e44d69e13641d39e5ace0910ac42d5e1e453",
+    "run_vectorbt.py": "0f54ce66609ce08992bea59eacf2feb4c8bbf53cf276aa4dae48501821ffff2e",
+    "run_backtesting.py": "3ac521771bb9d4951a06e16e16efa612c719a27fa15f0ca5f72b48fdaa19c28a",
+    "verify_ledgers.py": "b23eab2847736c5912a713f040164eed0aaf2e508c6075660124ece9fb760ae7",
+    "CONTRACT.md": "cbd6bee37c41e6b6c7ab41fb71ddfbadf57d50f4396a6070993dc68948ac1d61"
+  }
+}
