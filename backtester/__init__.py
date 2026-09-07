@@ -25,6 +25,9 @@ import pytz
 from datetime import datetime, time
 from .indicators import compute_atr, compute_rsi
 from . import orchestrator  # WFO dispatch registry
+from .ledger_lock import (acquire as _acquire_trade_csv_lock,
+                          release as _release_trade_csv_lock,
+                          ledger_run, engine_run_lock)
 from numba import njit, types
 from numba.typed import List
 
@@ -149,7 +152,7 @@ EMIT_OPT_SURFACE    = os.environ.get("EMIT_OPT_SURFACE", "0") in ("1", "true", "
 EMIT_OPT_SURFACE_SL = os.environ.get("EMIT_OPT_SURFACE_SL", "0") in ("1", "true", "True")
 
 
-EXPORT_PATH         = "trade_list.csv"
+EXPORT_PATH         = os.environ.get("BT_EXPORT_PATH", "trade_list.csv")
 METRICS             = ["ROI","PF","Sharpe","WinRate","Exp","MaxDrawdown"]
 
 
@@ -330,7 +333,7 @@ class Config:
 
     # I/O
     csv_file: str = "data/your_ohlc.csv"
-    export_path: str = "trade_list.csv"
+    export_path: str = field(default_factory=lambda: os.environ.get("BT_EXPORT_PATH", "trade_list.csv"))
 
     # ------------------------------------------------------------------
     # Mapping between Config field names and module-level UPPERCASE names.
@@ -525,53 +528,17 @@ def in_session(ts: datetime) -> bool:
     return start <= local.replace(tzinfo=None) < end
 
 
-def _trade_csv_lock_path(path: str) -> str:
-    return f"{path}.lock"
-
-
-def _acquire_trade_csv_lock(path: str, timeout_s: float = 120.0, stale_s: float = 6 * 3600):
-    """
-    Lightweight cross-process lock using an adjacent .lock file.
-    Prevents concurrent workers from deleting/appending the same CSV on Windows.
-    """
-    lock_path = _trade_csv_lock_path(path)
-    deadline = pytime.time() + timeout_s
-
-    while True:
-        try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            try:
-                os.write(fd, f"pid={os.getpid()} ts={pytime.time():.3f}\n".encode("utf-8"))
-            except OSError:
-                pass
-            return fd, lock_path
-        except FileExistsError:
-            # Clean up stale lock if a worker crashed and left the sentinel behind.
-            try:
-                age = pytime.time() - os.path.getmtime(lock_path)
-                if age > stale_s:
-                    try:
-                        os.remove(lock_path)
-                        continue
-                    except OSError:
-                        pass
-            except OSError:
-                pass
-
-            if pytime.time() >= deadline:
-                raise TimeoutError(f"Timed out waiting for CSV lock: {lock_path}")
-            pytime.sleep(0.10)
-
-
-def _release_trade_csv_lock(lock_fd, lock_path: str):
+@contextmanager
+def _ledger_run(config):
+    # Module globals are not thread-local. Refuse a second threaded run before
+    # it applies a Config; batch drivers use separate processes instead.
+    if not engine_run_lock.acquire(blocking=False):
+        raise RuntimeError("Concurrent Python engine runs require separate processes")
     try:
-        os.close(lock_fd)
-    except OSError:
-        pass
-    try:
-        os.remove(lock_path)
-    except OSError:
-        pass
+        with with_config(config), ledger_run(EXPORT_PATH):
+            yield
+    finally:
+        engine_run_lock.release()
 
 
 def _safe_remove_trade_csv(path: str, retries: int = 20):
@@ -1115,8 +1082,9 @@ def evaluate_filters(trades, rets, regimes=None):
     """
     Inspect the IS trades and decide which regimes and/or directions to disable.
     Prints PF, ROI and Trade count for every tested bucket, then fills the
-    module-level *blocked_* structures according to:
-         TradeCount > 50  and  PF < 1    block
+    module-level ``blocked_*`` structures according to::
+
+        TradeCount > 50  and  PF < 1    block
     """
     # Was: `global blocked_regimes, ...`: but those names are mutated
     # in-place via .clear()/.add()/.setdefault(), no rebind, so the
@@ -1963,6 +1931,7 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
     # Was: `global last_unfiltered_raw`. Moved to _runtime_state dict
     # so we can mutate without `global`. See _runtime_state docstring.
     eval_cache = {}
+    trial_observation_sharpes = {}
 
     # Helper to evaluate a single lookback
     def _evaluate(lb):
@@ -1977,7 +1946,7 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
 
         # 2) Backtest (with or without RRR optimisation)
         if not OPTIMIZE_RRR:
-            _, met, _, _, _ = backtest(dfi, sig)
+            _, met, _, trial_returns, _ = backtest(dfi, sig)
         else:
             # --- quick probe at fixed 5 R ---
             old_tp, old_tp_flag = TP_PERCENTAGE, USE_TP
@@ -2024,7 +1993,7 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
             # re-run with optimal TP
             globals()['TP_PERCENTAGE'] = best_rrr * SL_PERCENTAGE
             _runtime_state['last_unfiltered_raw'] = raw.copy()
-            _, met, _, _, _ = backtest(dfi, sig)
+            _, met, _, trial_returns, _ = backtest(dfi, sig)
             met['RRR'] = best_rrr
 
             # restore TP settings
@@ -2044,6 +2013,9 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
         # 5) Compute value to optimize (flip for MaxDrawdown)
         val = -met[metric] if metric == 'MaxDrawdown' else met[metric]
         eval_cache[lb] = (val, lb, met)
+        if OVERFIT_REPORT:
+            from backtester.dsr import sharpe_per_observation
+            trial_observation_sharpes[lb] = sharpe_per_observation(trial_returns)
         return eval_cache[lb]
 
     # Build list of all lookbacks and coarse subset
@@ -2110,10 +2082,10 @@ def _optimiser_impl(df, lb_range, metric, min_trades):
     # write to the scratch dict; no return value, printed line, or
     # control-flow change. Gated so default runs are inert.
     if OVERFIT_REPORT:
-        _runtime_state['_last_trial_sharpes'] = [
-            float(v[2]['Sharpe']) for v in eval_cache.values()
-            if v is not None and 'Sharpe' in v[2]
-        ]
+        # The optimiser metric may be a trade t-statistic or annualised
+        # bar Sharpe. Diagnostics always use mean/std of each trial's own
+        # trade returns, matching the chosen pooled OOS observations.
+        _runtime_state['_last_trial_sharpes'] = list(trial_observation_sharpes.values())
 
     return selected[1], selected[2]
 
@@ -2533,9 +2505,11 @@ def optimize_regimes_sequential(is_df, config: Optional[Config] = None):
     RRR optimisation). Iterates over `REGIME_LABELS` in order; on phase k the
     LB for label k is searched while LBs for labels 0..k-1 are held at their
     previously chosen values and labels k+1.. are held at DEFAULT_LB.
-    Returns:
-      best_lbs:  dict {label: lb}        (one entry per REGIME_LABELS)
-      best_rrrs: dict {label: rrr | None}
+    The return values are::
+
+        best_lbs:  dict {label: lb}        (one entry per REGIME_LABELS)
+        best_rrrs: dict {label: rrr | None}
+
     Works with REGIME_LABELS of any length in {2, 3, 4, 5}.
 
     `config` is optional; see `optimiser` docstring for the contract.
@@ -2697,7 +2671,7 @@ def classic_single_run(df, config: Optional[Config] = None):
 
     `config` is optional; see `optimiser` docstring for the contract.
     """
-    with with_config(config):
+    with _ledger_run(config):
         return _classic_single_run_impl(df)
 
 
@@ -3160,7 +3134,7 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
 
 def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] = None):
     """Rolling walk-forward driver. `config` is optional; see `optimiser`."""
-    with with_config(config):
+    with _ledger_run(config):
         return _walk_forward_impl(df, met_is_baseline, eq_is_baseline)
 
 
@@ -3801,7 +3775,7 @@ def main(config: Optional[Config] = None):
     current state and tweak fields. When omitted, reads from module
     globals, the legacy `bt.X = Y` API works exactly as before.
     """
-    with with_config(config):
+    with _ledger_run(config):
         return _main_impl()
 
 
@@ -3872,7 +3846,7 @@ def _main_impl():
         # carry the LINE_RE metric body, so parity harnesses are unaffected.
         # trial count = distinct baseline strategies (NOT windows*combos). The
         # chosen Sharpe is recomputed FROM oos_rets inside emit() in the
-        # Bailey-LdP sqrt(T)*mean/std convention (NOT met_is).
+        # Bailey-LdP mean/std convention (NOT the engine's scaled met_is).
         if OVERFIT_REPORT:
             from backtester import overfit_report
             overfit_report.emit(

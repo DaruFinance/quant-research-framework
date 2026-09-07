@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- DSR, PSR and MinTRL use per-observation Sharpe, with each trial computed from its own returns (#10).
+- ML5 uses causal expanding ranks; globally fitted detector tests now assert that leakage is detected (#11, #12).
+- Examples include real SOLUSDT OHLCV data and resolve it independently of the working directory (#16).
+- The downloader supports optional volume and validates timestamp units and resumed-file schemas (#17).
+- Ledger writes use run-scoped locks and configurable paths, with separate batch outputs (#18).
+- Source-install instructions replace the unpublished package badge; metric totals and version claims have consistency checks (#13, #14, #15).
+
 ## [0.7.6] - 2026-07-31
 
 ### Changed

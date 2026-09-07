@@ -49,7 +49,9 @@ def _resolve_format() -> str:
 
 
 def _surface_path(export_path: str, fmt: str) -> str:
-    base = os.path.join(os.path.dirname(export_path) or ".", "opt_surface")
+    name = os.path.basename(export_path)
+    surface = "opt_surface" if name == "trade_list.csv" else f"{name}.opt_surface"
+    base = os.path.join(os.path.dirname(export_path) or ".", surface)
     return f"{base}.{'csv' if fmt == 'csv' else 'parquet'}"
 
 

@@ -20,7 +20,6 @@ Run:
 """
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 # Enable the opt-in overfitting report. MUST precede `import backtester`,
@@ -38,19 +37,10 @@ sys.path.insert(0, str(ROOT))
 import numpy as np                                          # noqa: E402
 import pandas as pd                                         # noqa: E402
 
-# Runs on the full bundled SOL/USDT 1h series (REAL data, ~48k bars, ~7s).
-# Override with BT_CSV=... to use your own data, or EXAMPLE_BARS=N to run on
-# only the last N bars (faster, fewer walk-forward windows; N must exceed the
-# 10_000-bar IS window).
+# Runs on the full bundled real SOL/USDT spot 1h history, with volume.
+# Override with BT_CSV=... to use your own data.
 _BUNDLED = ROOT / "data" / "SOLUSDT_1h.csv"
-_BARS = int(os.environ.get("EXAMPLE_BARS", "0"))
-if "BT_CSV" not in os.environ:
-    if _BARS > 0:
-        _slice_path = Path(tempfile.gettempdir()) / f"qrf_e2e_SOL_{_BARS}.csv"
-        pd.read_csv(_BUNDLED).tail(_BARS).to_csv(_slice_path, index=False)
-        os.environ["BT_CSV"] = str(_slice_path)
-    else:
-        os.environ["BT_CSV"] = str(_BUNDLED)
+os.environ.setdefault("BT_CSV", str(_BUNDLED))
 
 import backtester as bt                                     # noqa: E402
 

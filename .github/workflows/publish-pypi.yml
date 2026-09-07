@@ -9,10 +9,8 @@ on:
 jobs:
   guard:
     # Skip-not-fail if PyPI Trusted Publishing isn't configured yet.
-    # We probe by calling the PyPI JSON API for our project; if it
-    # returns 200 AND the `pypi` GitHub environment is wired up, we
-    # proceed. Otherwise the publish job is skipped and the run shows
-    # a clean green check rather than a red email.
+    # The explicit repository variable opts into publishing. It does not
+    # verify PyPI account setup or imply that a package already exists.
     runs-on: ubuntu-latest
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}

@@ -1,6 +1,8 @@
 # Releasing
 
 This document describes the release process for the Python framework.
+The package is currently source-install only. The steps below configure optional
+future PyPI publishing; a tag alone does not establish a registry release.
 The Rust port has its own `RELEASING.md`; the two coordinate via
 matching version-suffix tags (e.g. Python `v0.3.1` ↔ Rust `v0.3.3`).
 
@@ -12,8 +14,9 @@ matching version-suffix tags (e.g. Python `v0.3.1` ↔ Rust `v0.3.3`).
    `publish-pypi.yml`, environment `pypi`.
 2. In this repo on GitHub: *Settings → Environments → New environment*
    named `pypi`, no secrets needed (trusted publishing replaces tokens).
-3. The `.github/workflows/publish-pypi.yml` workflow will run on every
-   `v*` tag push and publish to PyPI without any token in repo secrets.
+3. Set the repository Actions variable `PYPI_PUBLISHING_ENABLED` to `true`.
+   The `.github/workflows/publish-pypi.yml` workflow can then publish on `v*`
+   tags using trusted publishing. Without that variable, publishing is skipped.
 
 ## Cutting a release
 

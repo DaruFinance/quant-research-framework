@@ -54,11 +54,22 @@ jobs:
         with:
           path: quant-research-framework
 
-      - name: Checkout the Rust port (coordinated tag/branch)
+      - name: Resolve the coordinated Rust branch
+        id: counterpart
+        env:
+          PAIR_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/DaruFinance/quant-research-framework-rs.git "refs/heads/$PAIR_REF" >/dev/null; then
+            echo "ref=$PAIR_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the Rust port (matching branch, otherwise main)
         uses: actions/checkout@v4
         with:
           repository: DaruFinance/quant-research-framework-rs
-          ref: main
+          ref: ${{ steps.counterpart.outputs.ref }}
           path: quant-research-framework-rs
 
       - name: Set up Python 3.10

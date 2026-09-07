@@ -39,6 +39,7 @@ import csv
 import multiprocessing as mp
 import sys
 import time
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -194,6 +195,11 @@ def _run_one(spec: BatchSpec) -> dict:
     bt.DEFAULT_LB = spec.lb
     bt.PRINT_EQUITY_CURVE = False
     bt.USE_MONTE_CARLO    = False
+    # Each worker keeps a separate ledger, including repeated batch invocations.
+    base = Path(os.environ.get("BT_EXPORT_PATH", "trade_list.csv")).resolve().parent
+    base.mkdir(parents=True, exist_ok=True)
+    ledger_dir = Path(tempfile.mkdtemp(prefix=f"batch-{spec.name}-", dir=base))
+    bt.EXPORT_PATH = str(ledger_dir / "trade_list.csv")
 
     # Capture engine stdout per worker; we only need the final metric block.
     buf = io.StringIO()
@@ -214,6 +220,7 @@ def _run_one(spec: BatchSpec) -> dict:
         "elapsed_s": round(t1 - t0, 2),
         "ok":       ok,
         "err":      err,
+        "ledger":   bt.EXPORT_PATH,
         # The full metric stdout is recoverable from the engine's
         # exported trade_list.csv; we keep the buffer so the user can
         # inspect a specific run. Trim to last ~40 lines to keep memory
@@ -262,9 +269,9 @@ def main() -> int:
 
     with args.out.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["name", "lb", "ok", "elapsed_s", "err"])
+        w.writerow(["name", "lb", "ok", "elapsed_s", "err", "ledger"])
         for r in results:
-            w.writerow([r["name"], r["lb"], r["ok"], r["elapsed_s"], r["err"]])
+            w.writerow([r["name"], r["lb"], r["ok"], r["elapsed_s"], r["err"], r["ledger"]])
     print(f"\n[batch_runner] summary written to {args.out}")
 
     return 0 if all(r["ok"] for r in results) else 1

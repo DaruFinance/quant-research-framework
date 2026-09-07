@@ -4,7 +4,6 @@
 
 [![parity](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/parity.yml)
 [![docs](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml/badge.svg)](https://github.com/DaruFinance/quant-research-framework/actions/workflows/docs.yml)
-[![PyPI](https://img.shields.io/pypi/v/quant-research-framework.svg)](https://pypi.org/project/quant-research-framework/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19798593.svg)](https://doi.org/10.5281/zenodo.19798593)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/DaruFinance/quant-research-framework/main?filepath=examples%2Fnotebook%2Fwalkthrough.ipynb)
@@ -67,26 +66,32 @@ The cross-engine parity surfaces (Python vs Rust: 56/56 · 98/98 · 56/56 metric
 
 ## Quick Start
 
+Install from a source checkout; this project is not currently published on PyPI.
+
+```bash
+git clone https://github.com/DaruFinance/quant-research-framework.git
+cd quant-research-framework
+```
+
 ```bash
 pip install -r requirements.txt
 
-# Zero-setup smoke test: generate a synthetic OHLC CSV and run.
-python gen_synthetic.py
-BT_CSV=data/SYNTHETIC.csv python -m backtester
+# Run on the bundled real SOLUSDT hourly candles.
+BT_CSV=data/SOLUSDT_1h.csv python -m backtester
 ```
 
 The same thing from PowerShell:
 
 ```powershell
 pip install -r requirements.txt
-python gen_synthetic.py
-$env:BT_CSV = "data/SYNTHETIC.csv"; python -m backtester
+$env:BT_CSV = "data/SOLUSDT_1h.csv"; python -m backtester
 ```
 
-No network and no market data required: the generator writes a deterministic
-GBM series and the run prints the full IS / OOS / walk-forward metric block.
+No data download is required. The bundled Binance spot fixture contains 53,182
+hourly OHLCV bars, from SOLUSDT's first available bar on 2020-08-11 06:00 UTC
+through 2026-09-05 23:00 UTC, and the run prints the IS / OOS / walk-forward metrics.
 
-For real market data, swap the generator for a download:
+To download another market:
 
 ```bash
 python binance_ohlc_downloader.py --symbol DOGEUSDT --interval 30m --market spot \
@@ -95,6 +100,27 @@ BT_CSV=data/DOGEUSDT_30m.csv python -m backtester
 ```
 
 `BT_CSV` overrides the `CSV_FILE` constant in `backtester/__init__.py` without touching the source. If you prefer, edit the constant at the top of `backtester/__init__.py` instead.
+
+Add `--volume` to the downloader command for volume-based strategies. Without
+it, the downloader retains its five-column OHLC format. Both API and archive
+downloads support the flag; a resumed download must use the existing file's schema.
+
+`examples/volume_strategies.py` and `examples/end_to_end/end_to_end.py` use the
+bundled OHLCV fixture by default, including when launched from another directory.
+
+### Output files and concurrent runs
+
+The default ledger is `trade_list.csv`. Set `BT_EXPORT_PATH` or
+`Config(export_path="runs/my-run/trades.csv")` to choose another destination,
+with surface files written beside the ledger.
+
+Parent directories are created automatically. Each batch run keeps its ledgers
+in separate directories, and the batch summary includes their paths.
+
+A run holds an adjacent `.lock` file until all its ledger stages finish. Another
+run targeting that path fails immediately instead of overwriting it. A forced
+termination can leave a lock behind; remove it only after verifying the owning
+process has stopped.
 
 Note: the framework was repackaged from a single `backtester.py` script into a `backtester/` package in v0.3.0; the `python -m backtester` form replaces the legacy `python backtester.py` invocation.
 
@@ -146,7 +172,7 @@ Note: the framework was repackaged from a single `backtester.py` script into a `
 - **`docs/`**: Sphinx + autodoc API reference (Furo theme), built and
   published to GitHub Pages by `.github/workflows/docs.yml`.
 
-- **`tests/`**: pytest suite (32 tests, including Hypothesis property
+- **`tests/`**: pytest suite (including Hypothesis property
   tests on `parse_signals` and `walk_forward_regime` invariants).
 
 - **`binder/`**: Binder configuration (`requirements.txt`,
@@ -229,7 +255,7 @@ Optional scenarios such as:
 The framework follows [Semantic Versioning](https://semver.org/). See
 [`CHANGELOG.md`](CHANGELOG.md) for what changed in each release; the
 `version` field in [`pyproject.toml`](pyproject.toml) is the source of
-truth (currently `0.6.0`).
+truth (currently `0.7.6`).
 
 ---
 
@@ -260,7 +286,7 @@ independent surfaces:
   [`tools/parity_check.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_check.py).
 - **Regime + WFO (98/98 metric points)**: verified by
   [`tools/parity_regime.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_regime.py)
-  on the Rust port's v0.3.2 release.
+  on the coordinated Python and Rust revisions in CI.
 - **Forex mode (56/56 metric points on EURUSD 1h)**: verified by
   [`tools/parity_forex.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_forex.py).
 
@@ -275,7 +301,7 @@ continuously by the `parity_*.py` suite in CI.
 Cross-*architecture* parity, by contrast, **is** byte-identical. The Rust
 port compiled for `aarch64-unknown-linux-gnu` reproduces every printed
 metric digit exactly against committed x86_64 goldens, across all six
-bundled datasets (196 metric lines each, 1,176 in total), gated in CI by
+bundled datasets (194 metric lines each, 1,164 in total), gated in CI by
 [`tools/parity_arch.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_arch.py)
 on an x86_64 drift guard, a QEMU aarch64 run, and a native ARM runner.
 

@@ -7,24 +7,25 @@ deflated SR is the probability that the true SR exceeds zero
 conditional on the observed SR, the trial count, and the higher
 moments of the per-trade returns.
 
-Formulas (Bailey & López de Prado 2014, JPM 40(5):94--107):
+Formulas (Bailey & López de Prado 2014, JPM 40(5):94--107)::
 
     SR_0 = sqrt(V[SR_n]) * ((1 - euler_gamma) * Phi^{-1}(1 - 1/N)
                           + euler_gamma * Phi^{-1}(1 - 1/(N * e)))
     DSR  = Phi(  (SR_hat - SR_0) * sqrt(T - 1)
                / sqrt(1 - g_3 * SR_hat + (g_4 - 1) * SR_hat^2 / 4) )
 
-where:
-    SR_hat   = the chosen (in-sample maximised) Sharpe
+where::
+
+    SR_hat   = mean / sample_std of the chosen return observations
     V[SR_n]  = sample variance of the N trial Sharpes
-    N        = number of effectively independent trials
+    N        = number of trial Sharpes supplied
     T        = number of returns the chosen Sharpe was computed from
-    g_3, g_4 = sample skewness and excess kurtosis of the chosen
+    g_3, g_4 = sample skewness and raw kurtosis of the chosen
                strategy's per-trade returns
     Phi      = standard-normal CDF, Phi^{-1} = its inverse
     e        = Euler's number, euler_gamma ≈ 0.5772156649
 
-Public API:
+Public API::
 
     deflated_sharpe_ratio(
         sharpe_chosen, trial_sharpes, returns
@@ -33,9 +34,9 @@ Public API:
 Returns the DSR (a probability). Reject the null SR_true <= 0 at
 1 - alpha if DSR > 1 - alpha.
 
-This module is a *post-processing* utility, it does not run inside
-the engine and does not affect cross-language parity. The Rust
-mirror is on the v0.4.0 roadmap.
+This module supplies the engine's optional overfit report and the
+benchmark annotations. The Rust counterpart is ``src/dsr.rs`` in
+``quant-research-framework-rs``.
 """
 from __future__ import annotations
 
@@ -49,9 +50,28 @@ EULER_GAMMA = 0.5772156649015329
 _SR_TARGET_FLOOR = 1e-12  # guard for division by (SR_hat - SR*) in MinTRL
 
 
+def sharpe_per_observation(returns: Sequence[float]) -> float:
+    """Mean / sample standard deviation (ddof=1), without sqrt(T).
+
+    All DSR, PSR and MinTRL Sharpe arguments, including each trial and
+    benchmark, use this unit and the same observation type (e.g. trades).
+    Compute each trial from its own returns; unequal sample lengths cannot
+    be undone using the chosen strategy's T. Non-finite observations are
+    dropped. Fewer than two observations or zero dispersion return NaN.
+    This helper does not change the t-statistics used by multitest/haircut.
+    """
+    rets = np.asarray(returns, dtype=float)
+    rets = rets[np.isfinite(rets)]
+    if rets.size < 2:
+        return float("nan")
+    sd = float(rets.std(ddof=1))
+    return float(rets.mean() / sd) if sd > 0.0 else float("nan")
+
+
 def expected_max_sharpe_under_null(trial_sharpes: Sequence[float]) -> float:
     """E[max SR_n] under the null that the true SR is zero, using the
-    closed form of Bailey & López de Prado 2014 §3 (the SR_0 quantity)."""
+    closed form of Bailey & López de Prado 2014 §3 (the SR_0 quantity).
+    Trial inputs and the output are per-observation Sharpes (mean/std)."""
     arr = np.asarray(trial_sharpes, dtype=float)
     arr = arr[np.isfinite(arr)]
     n = len(arr)
@@ -75,6 +95,10 @@ def deflated_sharpe_ratio(
     """Probability the true Sharpe exceeds zero, conditional on the
     observed in-sample maximised Sharpe, the per-trial Sharpe variance,
     and the per-trade return moments.
+
+    Both chosen and trial Sharpes must be mean/sample_std, without
+    annualisation or sqrt(T) scaling. ``returns`` must be the chosen
+    Sharpe's observations. Trial Sharpes use their own observation counts.
 
     Returns a value in [0, 1]; values near 1 indicate the chosen SR is
     unlikely to be a chance maximum over the grid.
@@ -107,8 +131,10 @@ def deflated_sharpe_ratio(
 
 
 def _sr_std_correction(rets: np.ndarray, sharpe: float):
-    """Bailey-LdP 2014 eq (9) variance-correction term
+    """Bailey-LdP 2014 eq (9) variance-correction term::
+
         1 - g_3*SR + (g_4 - 1)*SR^2/4
+
     with g_4 the *raw* fourth standardised moment (= 3 for Normal).
     `rets` must already be finite-filtered. Returns the float term, or
     None if the dispersion is degenerate (sd <= 0). Single shared moment
@@ -127,11 +153,14 @@ def _sr_std_correction(rets: np.ndarray, sharpe: float):
 def probabilistic_sharpe_ratio(
     sharpe: float, returns: Sequence[float], sr_benchmark: float = 0.0
 ) -> float:
-    """Probabilistic Sharpe Ratio (Bailey & López de Prado 2014):
+    """Probabilistic Sharpe Ratio (Bailey & López de Prado 2014)::
+
         PSR(SR*) = Phi( (SR_hat - SR*) * sqrt(T - 1) / sqrt(denom) ).
+
     DSR is exactly PSR with SR* = SR_0, so both reuse
     `_sr_std_correction`. Returns P(SR_true > SR*) in [0,1], or NaN on the
-    same degenerate guards as DSR."""
+    same degenerate guards as DSR. ``sharpe`` and ``sr_benchmark`` must
+    both be per-observation mean/sample_std, without sqrt(T) scaling."""
     rets = np.asarray(returns, dtype=float)
     rets = rets[np.isfinite(rets)]
     t = len(rets)
@@ -148,10 +177,13 @@ def min_track_record_length(
     sharpe: float, returns: Sequence[float],
     sr_benchmark: float = 0.0, prob: float = 0.95,
 ) -> float:
-    """Minimum Track Record Length (Bailey & López de Prado 2014, eq 19):
+    """Minimum Track Record Length (Bailey & López de Prado 2014, eq 19)::
+
         MinTRL = 1 + (1 - g_3*SR + (g_4-1)*SR^2/4) * (Phi^{-1}(p)/(SR-SR*))^2.
+
     Minimum observations for PSR(SR*) >= prob. Returns the count (float),
-    inf if SR <= SR*, or NaN on the DSR degenerate guards."""
+    inf if SR <= SR*, or NaN on the DSR degenerate guards. Both Sharpe
+    arguments are per-observation mean/sample_std, without sqrt(T)."""
     rets = np.asarray(returns, dtype=float)
     rets = rets[np.isfinite(rets)]
     if len(rets) < 3 or not math.isfinite(sharpe):
@@ -167,8 +199,10 @@ def min_track_record_length(
 
 
 def min_backtest_length(n_trials: int, sr_target: float) -> float:
-    """Minimum Backtest Length (Bailey-Borwein-LdP-Zhu 2014):
+    """Minimum Backtest Length (Bailey-Borwein-LdP-Zhu 2014)::
+
         minBTL ≈ ((1-γ)*Phi^{-1}(1-1/N) + γ*Phi^{-1}(1-1/(N e)))^2 / SR_target^2.
+
     Observations below which the expected max SR over N independent trials
     under the null exceeds `sr_target`. `sr_target` MUST be a per-period
     (per-observation) SR for the result to be in observations. Reuses the

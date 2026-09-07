@@ -15,7 +15,7 @@ Once those are set, every code path that looks at regimes (single-run with
 USE_REGIME_SEG, WFO+regime in walk_forward, evaluate_filters, etc.)
 picks them up automatically.
 
-Two demos are included below. Pick one by setting ``DEMO`` near the top.
+Three demos are included below. Pick one by setting ``DEMO`` near the top.
 
 Run:
     python examples/regime_custom/regime_custom.py
@@ -28,12 +28,10 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
 sys.path.insert(0, _ROOT)
 
-if len(sys.argv) > 1:
-    os.environ["BT_CSV"] = sys.argv.pop(1)
-
 import numpy as np                                        # noqa: E402
 import pandas as pd                                       # noqa: E402
 import backtester as bt                                   # noqa: E402
+from backtester.invariants import registers_invariant      # noqa: E402
 
 
 DEMO = "vol4"   # one of: "vol2", "vol4", "ml5"
@@ -42,6 +40,7 @@ DEMO = "vol4"   # one of: "vol2", "vol4", "ml5"
 # --- Demo 1: 2-regime volatility detector ---------------------------------
 VOL2_LABELS = ['Calm', 'Volatile']
 
+@registers_invariant(name="example_vol2", data_kind="ohlc_df")
 def detect_regimes_vol2(df: pd.DataFrame) -> pd.Series:
     """Two regimes by 50-bar realised vol vs its 250-bar median."""
     ret = df['close'].pct_change()
@@ -55,6 +54,7 @@ def detect_regimes_vol2(df: pd.DataFrame) -> pd.Series:
 # --- Demo 2: 4-regime trend × volatility detector -------------------------
 VOL4_LABELS = ['CalmUp', 'CalmDown', 'VolUp', 'VolDown']
 
+@registers_invariant(name="example_vol4", data_kind="ohlc_df")
 def detect_regimes_vol4(df: pd.DataFrame) -> pd.Series:
     ret = df['close'].pct_change()
     trend = (df['close'] - df['close'].shift(50)).shift(1)
@@ -75,40 +75,46 @@ ML5_LABELS = ['R0', 'R1', 'R2', 'R3', 'R4']
 class TinyKMeansLikeDetector:
     """
     Stand-in for an ML clusterer: bins the previous bar's (return, vol)
-    pair into 5 quantile buckets. Replace this with a fitted
-    sklearn.cluster.KMeans / HMM / mixture model, the contract is the
-    same: a function (df) -> pd.Series[label].
+    pair using its expanding historical percentile. At bar i, both the
+    score and its reference distribution use prices through i-1 only.
+    A replacement clusterer must also fit only on already available data.
     """
     def __init__(self):
         self._labels = ML5_LABELS
 
     def __call__(self, df: pd.DataFrame) -> pd.Series:
-        ret  = df['close'].pct_change().shift(1)
-        sd   = df['close'].pct_change().rolling(50, min_periods=50).std().shift(1)
-        # Combine into a single score, bucket into 5 quantiles.
-        score = (ret.fillna(0) / sd.replace(0, np.nan)).fillna(0)
-        try:
-            buckets = pd.qcut(score, q=5, labels=self._labels, duplicates='drop')
-        except ValueError:
-            buckets = pd.Series(self._labels[0], index=df.index)
+        ret = df['close'].pct_change(fill_method=None)
+        sd = ret.rolling(50, min_periods=50).std()
+        score = ret / sd.replace(0, np.nan)
+        # Expanding.rank uses an ordered window, avoiding a quadratic
+        # expanding.apply scan. Shift the entire fit and score together.
+        rank = score.expanding(min_periods=50).rank(pct=True).shift(1)
+        buckets = pd.cut(rank, bins=[0, .2, .4, .6, .8, 1],
+                         labels=self._labels, include_lowest=True)
         return buckets.astype(object).fillna(self._labels[0])
 
 
-# --- Pick a demo and wire it in -------------------------------------------
-if DEMO == "vol2":
-    bt.REGIME_LABELS  = VOL2_LABELS
-    bt.detect_regimes = detect_regimes_vol2
-elif DEMO == "vol4":
-    bt.REGIME_LABELS  = VOL4_LABELS
-    bt.detect_regimes = detect_regimes_vol4
-elif DEMO == "ml5":
-    bt.REGIME_LABELS  = ML5_LABELS
-    bt.detect_regimes = TinyKMeansLikeDetector()
-else:
-    raise ValueError(f"Unknown DEMO: {DEMO!r}")
+@registers_invariant(name="ml5_quantile", data_kind="ohlc_df")
+def detect_regimes_ml5(df: pd.DataFrame) -> pd.Series:
+    return TinyKMeansLikeDetector()(df)
+
+
+def main():
+    if len(sys.argv) > 1:
+        # backtester has already imported its defaults; update the runtime
+        # path as well as the environment used by callers.
+        bt.CSV_FILE = os.environ["BT_CSV"] = sys.argv[1]
+    demos = {
+        "vol2": (VOL2_LABELS, detect_regimes_vol2),
+        "vol4": (VOL4_LABELS, detect_regimes_vol4),
+        "ml5": (ML5_LABELS, detect_regimes_ml5),
+    }
+    if DEMO not in demos:
+        raise ValueError(f"Unknown DEMO: {DEMO!r}")
+    bt.REGIME_LABELS, bt.detect_regimes = demos[DEMO]
+    bt.USE_REGIME_SEG = True
+    bt.main()
 
 
 if __name__ == "__main__":
-    # Make sure regime segmentation is on for this example.
-    bt.USE_REGIME_SEG = True
-    bt.main()
+    main()
