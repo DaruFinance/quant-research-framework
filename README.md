@@ -208,6 +208,21 @@ See [`examples/README.md`](examples/README.md) for the full contract and `exampl
   per-regime LB just rotates inside each window, fixed in v0.2.0 (was
   previously re-anchoring the IS window on every regime change).
 
+### Optimization metric
+
+`OPT_METRIC` defaults to `Sharpe`. Daniel Gatto designed the optional
+`Consistency` score as an example objective for this project. The name does
+not refer to an established financial metric: the score splits trade returns
+into 5 chronological segments, weights later segments more heavily and
+blends that result with total ROI.
+
+The single-asset optimiser selects a named field from its metric dictionary.
+A user can implement another optimization metric by adding its calculation to
+the engine's metric output and choosing that name through `Config.opt_metric`
+or `OPT_METRIC`; this interface has no arbitrary objective callback.
+`backtester.objectives.MultiTermObjective` is a separate objective
+implementation for panel research.
+
 ### Realism Controls
 - Configurable **fees** and **slippage** on entry/exit
 - Optional **funding fees** for crypto at scheduled UTC times
