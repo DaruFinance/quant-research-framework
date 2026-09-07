@@ -14,7 +14,7 @@ It answers one question: *does an apparent edge survive out-of-sample evaluation
 
 ## Two engines, one spec
 
-This repository is the **Python reference**, the readable specification. A separate **Rust port** re-implements it for speed (28.5–39× faster, 29–62× less memory) and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red: the correctness claim is *enforced, not asserted*.
+This repository is the **Python reference**, the readable specification. A separate **Rust port** re-implements it for speed, and a parity oracle runs both on identical input, asserting the metrics agree within `1e-3`. If the port drifts from this reference, CI goes red: the correctness claim is *enforced, not asserted*. Current measurements and their exact boundaries are [reported below](#performance).
 
 ```
                 ┌────────────────────────────────────────────────┐
@@ -25,7 +25,7 @@ This repository is the **Python reference**, the readable specification. A separ
                 ┌───────────────▼──────┐  ┌──────▼───────────────┐
                 │  Python reference    │  │      Rust port       │
                 │  backtester/         │  │  (sibling repo, …-rs)│
-                │  (this repo, the spec)│ │   speed: 28.5–39×    │
+                │  (this repo, the spec)│ │  measured below     │
                 └───────────────┬──────┘  └──────┬───────────────┘
                                 │ metrics        │ metrics
                                 ▼                ▼
@@ -305,22 +305,27 @@ bundled datasets (194 metric lines each, 1,164 in total), gated in CI by
 [`tools/parity_arch.py`](https://github.com/DaruFinance/quant-research-framework-rs/blob/main/tools/parity_arch.py)
 on an x86_64 drift guard, a QEMU aarch64 run, and a native ARM runner.
 
-It runs **28.5–39× faster** (Python reference vs Rust port) and uses **29–62× less memory**:
+## Performance
 
-| Bars   | Python warm (s) | Rust (s) | Speed-up | Python RSS (MB) | Rust RSS (MB) |
-|-------:|----------------:|---------:|---------:|----------------:|--------------:|
-|  5,000 |    3.51 ± 8.6%  |   0.010  |   351×†  |             272 |           3.0 |
-| 15,000 |    4.35 ± 10.0% |   0.050  |  87.0×†  |             277 |           4.5 |
-| 30,000 |    5.86 ± 10.2% |   0.150  |  39.1×   |             280 |           7.2 |
-| 48,000 |    7.70 ± 11.5% |   0.270  |  28.5×   |             292 |          10.0 |
+The current benchmark uses 150,000 real BTCUSDT 30-minute bars. One fresh
+process per engine runs ten fixed configurations, five signal families with
+two lookbacks each, through 28 full WFO windows. Python's first Numba compile
+and persisted ledgers are included; Rust compilation is excluded.
 
-(Median warm wall-clock over n=15 runs after one untimed warm-up, peak RSS as
-the max observed, on the bundled `SOLUSDT_1h.csv`. †The 5,000- and 15,000-bar
-rows are measurement-floor artifacts: `/usr/bin/time` resolves to 0.01 s, and
-at those sizes every Rust sample lands on one or two values, so the ratios are
-inflated by the timer as well as by fixed Python start-up. The steady-state
-figure is the 48k row, 28.5×. Same harness and numbers as the paper; reproduce
-with `python tools/bench_paper.py --runs 15` from the sibling Rust repo.)
+| Engine | Wall | User + sys | Peak RSS |
+|---|---:|---:|---:|
+| Python reference | 112.37 s | 109.60 s | 287.37 MiB |
+| Rust port | 7.20 s | 5.54 s | 10.75 MiB |
+
+This single batch observed 15.61 times less wall time and 26.73 times less
+peak memory for Rust. All ten ledger row counts matched, and the largest
+deterministic metric difference was `6.67e-14`. This is one observation under
+the stated workload, not a general speed guarantee.
+
+A separate matched execution test compares QRF, vectorbt and Backtesting.py
+on identical frozen events. It does not include WFO or signal calculation.
+The full method, competitor results, data recipe and machine-readable evidence
+are in [`benchmarks/`](benchmarks/).
 
 ## Comparison vs other open-source backtesters
 
