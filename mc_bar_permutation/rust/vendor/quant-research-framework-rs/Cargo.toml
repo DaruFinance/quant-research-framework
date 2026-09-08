@@ -2,6 +2,7 @@
 name = "quant-research-framework-rs"
 version = "0.7.6"
 edition = "2021"
+authors = ["Daniel Gatto <daniel@daru.finance>"]
 description = "Walk-forward backtester with robustness tests (Rust port of quant-research-framework)"
 license = "Apache-2.0"
 repository = "https://github.com/DaruFinance/quant-research-framework-rs"

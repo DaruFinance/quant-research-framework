@@ -10,7 +10,7 @@ and a tolerance-bounded cross-language parity contract against
 This is the Python reference implementation. The companion paper
 introducing the framework and its parity discipline is *A
 Reproducibility-First Walk-Forward Backtester with Tolerance-Bounded
-Cross-Language Parity* (Vieira Gatto, 2026).
+Cross-Language Parity* (Gatto, 2026).
 
 .. toctree::
    :maxdepth: 2

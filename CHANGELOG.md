@@ -316,10 +316,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and runs the four-command checklist on every push and pull request.
 
 ### Author
-- Sole author of record canonicalised to **Daniel Vieira Gatto**
-  in `CITATION.cff` (alias: `DaruFinance`); previous variants
-  (`DaruFinance`, `Daniel G.`) deprecated for citation-tracking
-  consistency. References in arXiv-submitted paper updated to match.
+- Sole author of record uses **Daniel Gatto** in package bylines and
+  **Gatto, D. V.** in academic citations. The `DaruFinance` alias remains
+  in `CITATION.cff` for citation tracking.
 
 ## [0.2.5] - 2026-04-30
 
