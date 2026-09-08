@@ -12,8 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("BT_CSV", "data_SOLUSDT_1h.csv")
 
 project = "quant-research-framework"
-author = "Daniel Vieira Gatto"
-copyright = "2026, Daniel Vieira Gatto"
+author = "Daniel Gatto"
+copyright = "2026, Daniel Gatto"
 release = re.search(
     r'(?m)^version\s*=\s*"([^"]+)"',
     (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"),

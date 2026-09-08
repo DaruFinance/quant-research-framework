@@ -3,8 +3,8 @@ message: "If you use this software in academic or research work, please cite it 
 title: "quant-research-framework: a walk-forward backtester with ledger invariant tests and tolerance-bounded cross-language parity"
 type: software
 authors:
-  - family-names: "Vieira Gatto"
-    given-names: "Daniel"
+  - family-names: "Gatto"
+    given-names: "Daniel V."
     alias: "DaruFinance"
     email: "daniel@daru.finance"
 version: "0.7.6"

@@ -9,7 +9,7 @@ description = "Walk-forward backtester with statistical validation and robustnes
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "Daniel Vieira Gatto", email = "daniel@daru.finance" }]
+authors = [{ name = "Daniel Gatto", email = "daniel@daru.finance" }]
 keywords = ["backtesting", "walk-forward", "quant", "research", "trading"]
 classifiers = [
     "Programming Language :: Python :: 3",
