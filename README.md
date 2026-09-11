@@ -203,6 +203,12 @@ See [`examples/README.md`](examples/README.md) for the full contract and `exampl
 - Baseline IS and OOS backtests
 - Rolling re-optimization and forward testing per window (`USE_WFO`,
   `WFO_TRIGGER_MODE` ∈ {`candles`, `trades`}, `WFO_TRIGGER_VAL`)
+- Training windows default to `rolling`. Set
+  `Config(wfo_window_mode="expanding")` to keep the first IS start fixed while
+  each later optimisation includes the history observed so far; on the bundled
+  SOL data, use `Config(oos_candles=10_000, wfo_window_mode="expanding")`, where
+  `backtest_candles` remains the initial IS length. The engine rejects expanding
+  runs whose data cannot hold the initial IS plus the OOS span.
 - Aggregated WFO performance curve + replication checks
 - **WFO + regime segmentation**: WFO walks its standard cadence; the
   per-regime LB just rotates inside each window, fixed in v0.2.0 (was
