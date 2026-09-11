@@ -5,7 +5,7 @@ Walk-forward backtester for forex and crypto datasets.
 
 Execution flow:
 1. Runs baseline in-sample (IS) and out-of-sample (OOS) tests.
-2. Optionally runs rolling walk-forward optimization (WFO).
+2. Optionally runs rolling or expanding walk-forward optimization (WFO).
 3. Reports performance and robustness metrics.
 4. Optionally plots equity curves.
 
@@ -143,9 +143,10 @@ ROBUSTNESS_SCENARIOS = {
 MAX_ROBUSTNESS_SCENARIOS = 5
 
 # Walk-forward settings
-USE_WFO             = True                       # do rolling windows?
+USE_WFO             = True                       # run walk-forward windows?
 WFO_TRIGGER_MODE    = "candles"                   # "candles" or "trades"
 WFO_TRIGGER_VAL     = 5000                         # n-candles or n-trades per window
+WFO_WINDOW_MODE     = "rolling"                   # "rolling" or "expanding"
 
 # Overfitting-statistics report. OFF by default: when on, an
 # ADDITIVE block (DSR/PSR/PBO/MinTRL/MinBTL/haircut) is printed after the
@@ -332,6 +333,7 @@ class Config:
     use_wfo: bool = True
     wfo_trigger_mode: str = "candles"
     wfo_trigger_val: int = 5000
+    wfo_window_mode: str = "rolling"
 
     # Overfitting-statistics report; default OFF.
     overfit_report: bool = False
@@ -401,12 +403,32 @@ class Config:
         'use_wfo': 'USE_WFO',
         'wfo_trigger_mode': 'WFO_TRIGGER_MODE',
         'wfo_trigger_val': 'WFO_TRIGGER_VAL',
+        'wfo_window_mode': 'WFO_WINDOW_MODE',
         'overfit_report': 'OVERFIT_REPORT',
         'emit_opt_surface': 'EMIT_OPT_SURFACE',
         'emit_opt_surface_sl': 'EMIT_OPT_SURFACE_SL',
         'csv_file': 'CSV_FILE',
         'export_path': 'EXPORT_PATH',
     }
+
+    def __post_init__(self):
+        if self.wfo_window_mode not in ("rolling", "expanding"):
+            raise ValueError(
+                "wfo_window_mode must be 'rolling' or 'expanding'; "
+                f"got {self.wfo_window_mode!r}"
+            )
+        if self.wfo_window_mode == "expanding":
+            if self.backtest_candles <= 0 or self.oos_candles <= 0:
+                raise ValueError(
+                    "expanding WFO requires positive backtest_candles and oos_candles"
+                )
+            if self.wfo_trigger_mode not in ("candles", "trades"):
+                raise ValueError(
+                    "wfo_trigger_mode must be 'candles' or 'trades'; "
+                    f"got {self.wfo_trigger_mode!r}"
+                )
+            if self.wfo_trigger_val <= 0:
+                raise ValueError("expanding WFO requires wfo_trigger_val > 0")
 
     @classmethod
     def from_module(cls) -> 'Config':
@@ -3089,7 +3111,7 @@ def _run_wfo_window(is_df, oos_df, lb, window_tag, regimes_is, regimes_oos, rb_s
 
 
 def walk_forward(df, met_is_baseline, eq_is_baseline, config: Optional[Config] = None):
-    """Rolling walk-forward driver. `config` is optional; see `optimiser`."""
+    """Walk-forward driver. `config` is optional; see `optimiser`."""
     with _ledger_run(config):
         return _walk_forward_impl(df, met_is_baseline, eq_is_baseline)
 
@@ -3105,6 +3127,7 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
     routes receive a fully-baked ``rb_scenarios`` list rather than
     re-deriving it (which would re-read globals and risk drift).
     """
+    _validate_wfo_window(len(df))
     rb_scenarios = _build_rb_scenarios()
     key = orchestrator.RouteKey(
         regime=(USE_WFO and USE_REGIME_SEG),
@@ -3114,6 +3137,37 @@ def _walk_forward_impl(df, met_is_baseline, eq_is_baseline):
         hold_period_set=False,
     )
     return orchestrator.dispatch(key)(df, met_is_baseline, eq_is_baseline, rb_scenarios)
+
+
+def _validate_wfo_window(n):
+    if WFO_WINDOW_MODE not in ("rolling", "expanding"):
+        raise ValueError(
+            "WFO_WINDOW_MODE must be 'rolling' or 'expanding'; "
+            f"got {WFO_WINDOW_MODE!r}"
+        )
+    if WFO_WINDOW_MODE == "expanding":
+        if BACKTEST_CANDLES <= 0:
+            raise ValueError("expanding WFO requires BACKTEST_CANDLES > 0")
+        if OOS_CANDLES <= 0 or n < OOS_CANDLES + BACKTEST_CANDLES:
+            raise ValueError(
+                "expanding WFO requires len(data) >= OOS_CANDLES + "
+                "BACKTEST_CANDLES with both windows positive; reduce "
+                "OOS_CANDLES or the initial BACKTEST_CANDLES"
+            )
+        if WFO_TRIGGER_MODE not in ("candles", "trades"):
+            raise ValueError(
+                "WFO_TRIGGER_MODE must be 'candles' or 'trades'; "
+                f"got {WFO_TRIGGER_MODE!r}"
+            )
+        if WFO_TRIGGER_VAL <= 0:
+            raise ValueError("expanding WFO requires WFO_TRIGGER_VAL > 0")
+
+
+def _wfo_is_start(cur_start, first_is_start):
+    """Return the IS left edge for the configured training-window mode."""
+    if WFO_WINDOW_MODE == "expanding":
+        return first_is_start
+    return cur_start - BACKTEST_CANDLES
 
 
 def _build_rb_scenarios():
@@ -3151,6 +3205,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
     if True:  # preserved for diff-minimisation against pre-#5 source
         n           = len(df)
         start_total = n - OOS_CANDLES
+        first_is_start = start_total - BACKTEST_CANDLES
         cur_start   = start_total
         window_no   = 1
         all_oos_rets = []
@@ -3165,7 +3220,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
         # one-shot evaluate_filters on the very first IS window (identical to
         # the legacy behaviour, but anchored to the WFO IS window not a regime
         # stretch). This matters when FILTER_REGIMES / FILTER_DIRECTIONS is on.
-        is_start_init = max(0, start_total - BACKTEST_CANDLES)
+        is_start_init = max(0, first_is_start)
         is_df_init    = df.iloc[is_start_init:start_total].reset_index(drop=True)
         regimes_init  = regimes_full.iloc[is_start_init:start_total].reset_index(drop=True)
         initial_lbs, _ = optimize_regimes_sequential(is_df_init)
@@ -3185,7 +3240,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
             if WFO_TRIGGER_MODE == 'candles':
                 cur_end = min(cur_start + WFO_TRIGGER_VAL, n)
             else:   # by trade-count
-                is_win_start_p = cur_start - BACKTEST_CANDLES
+                is_win_start_p = _wfo_is_start(cur_start, first_is_start)
                 is_df_p        = df.iloc[is_win_start_p:cur_start].reset_index(drop=True)
                 best_lbs_p, _  = optimize_regimes_sequential(is_df_p)
                 if not best_lbs_p or all(v is None for v in best_lbs_p.values()):
@@ -3208,7 +3263,7 @@ def _walk_forward_regime_path(df, met_is_baseline, eq_is_baseline, rb_scenarios)
                     cur_end = min(cur_start + tr_p[idx][2] + 1, n)
 
             # --- IS slice + per-regime optimisation -----------------------
-            is_win_start = cur_start - BACKTEST_CANDLES
+            is_win_start = _wfo_is_start(cur_start, first_is_start)
             is_df_roll   = df.iloc[is_win_start:cur_start].reset_index(drop=True)
             regimes_is   = regimes_full.iloc[is_win_start:cur_start].reset_index(drop=True)
 
@@ -3271,6 +3326,7 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
     # ===== 2.  WFO **without** regime segmentation =========================
     n           = len(df)
     start_total = n - OOS_CANDLES
+    first_is_start = start_total - BACKTEST_CANDLES
     cur_start   = start_total
     window_no   = 1
     all_oos_rets = []
@@ -3283,7 +3339,7 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
         if WFO_TRIGGER_MODE == 'candles':
             cur_end = min(cur_start + WFO_TRIGGER_VAL, n)
         else:   # by trade-count
-            is_win_start = cur_start - BACKTEST_CANDLES
+            is_win_start = _wfo_is_start(cur_start, first_is_start)
             is_df_roll   = df.iloc[is_win_start:cur_start].reset_index(drop=True)
             lb_roll, _   = optimiser(is_df_roll, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
             if not lb_roll:
@@ -3299,8 +3355,8 @@ def _walk_forward_default_path(df, met_is_baseline, eq_is_baseline, rb_scenarios
                 idx     = min(WFO_TRIGGER_VAL, len(tr_tmp)) - 1
                 cur_end = min(cur_start + tr_tmp[idx][2] + 1, n)
 
-        # --- real rolling IS  current OOS ---------------------------------
-        is_win_start = cur_start - BACKTEST_CANDLES
+        # --- configured IS window, followed by current OOS ----------------
+        is_win_start = _wfo_is_start(cur_start, first_is_start)
         is_df_roll   = df.iloc[is_win_start:cur_start].reset_index(drop=True)
         lb_roll, _   = optimiser(is_df_roll, range(*LOOKBACK_RANGE), OPT_METRIC, MIN_TRADES)
         if not lb_roll:
@@ -3748,6 +3804,9 @@ def _main_impl():
 
     df = age_dataset(df, AGE_DATASET)
 
+    if USE_WFO:
+        _validate_wfo_window(len(df))
+
     df['is_traded'] = df['time'].apply(lambda ts: in_session(ts) if TRADE_SESSIONS else True)
 
     # clear any stale side-channel from a prior main() call in the
@@ -3815,8 +3874,8 @@ def _main_impl():
         if PRINT_EQUITY_CURVE:
             plt.figure(figsize=(10,5))
             # WFO equity only
-            plt.plot(eq_wfo * ACCOUNT_SIZE, label='WFO Rolling')
-            # robustness scenarios (on the WFO rolling curve)
+            plt.plot(eq_wfo * ACCOUNT_SIZE, label=f'WFO {WFO_WINDOW_MODE.title()}')
+            # robustness scenarios (on the configured WFO curve)
             for name, eq_rb in rb_eq_wfo.items():
                 plt.plot(eq_rb * ACCOUNT_SIZE, label=name)
             # split at the end of the first WFO IS segment (length of eq_is passed to walk_forward)

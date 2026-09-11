@@ -16,6 +16,46 @@ on:
   workflow_dispatch:
 
 jobs:
+  expanding-wfo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+        with:
+          path: quant-research-framework
+      - name: Resolve the coordinated Rust branch
+        id: counterpart-expanding
+        env:
+          PAIR_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/DaruFinance/quant-research-framework-rs.git "refs/heads/$PAIR_REF" >/dev/null; then
+            echo "ref=$PAIR_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Checkout the Rust port
+        uses: actions/checkout@v7
+        with:
+          repository: DaruFinance/quant-research-framework-rs
+          ref: ${{ steps.counterpart-expanding.outputs.ref }}
+          path: quant-research-framework-rs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+      - name: Install Python framework deps
+        working-directory: quant-research-framework
+        run: pip install -r requirements.txt
+      - name: Expanding WFO parity and OOS ledgers
+        working-directory: quant-research-framework-rs
+        env:
+          QRF_PY_DIR: ${{ github.workspace }}/quant-research-framework
+        run: |
+          cargo build --release
+          python -m unittest tools/test_parity_expanding_wfo.py
+          python tools/parity_expanding_wfo.py
+
   pytest-matrix:
     name: pytest (${{ matrix.os }} / py${{ matrix.python }})
     runs-on: ${{ matrix.os }}

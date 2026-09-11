@@ -49,6 +49,40 @@ def _apply_cfg(monkeypatch):
         monkeypatch.setattr(bt, k, v)
 
 
+def test_panel_delegates_expanding_window_per_asset(monkeypatch, tmp_path):
+    panel = load_panel(PANEL_PATHS)
+    cfg = bt.Config.from_module()
+    cfg.backtest_candles = 300
+    cfg.oos_candles = 600
+    cfg.wfo_trigger_val = 150
+    cfg.wfo_window_mode = "expanding"
+    cfg.lookback_range = (18, 21)
+    cfg.min_trades = 1
+    cfg.smart_optimization = False
+    cfg.optimize_rrr = False
+    cfg.use_monte_carlo = False
+    cfg.print_equity_curve = False
+    cfg.export_path = str(tmp_path / "panel.csv")
+    seen = []
+    original = bt.optimiser
+
+    def recording_optimizer(is_df, *args, **kwargs):
+        seen.append((len(is_df), is_df["time"].iloc[0]))
+        return original(is_df, *args, **kwargs)
+
+    monkeypatch.setattr(bt, "optimiser", recording_optimizer)
+    monkeypatch.setattr(bt, "ROBUSTNESS_SCENARIOS", {})
+    with bt.with_config(cfg):
+        result = walk_forward_panel(panel)
+
+    assert set(result) == set(panel.assets)
+    expected_lengths = [300, 450, 600, 750]
+    for asset_index in range(len(panel.assets)):
+        block = seen[asset_index * 4:(asset_index + 1) * 4]
+        assert [item[0] for item in block] == expected_lengths
+        assert len({item[1] for item in block}) == 1
+
+
 def test_panel_route_registered_under_multi_asset_true():
     """The Phase 1 dispatch registry must now know about
     RouteKey(multi_asset=True). Imported eagerly by
